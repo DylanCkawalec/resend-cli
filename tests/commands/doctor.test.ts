@@ -1,9 +1,6 @@
 import { describe, test, expect, spyOn, afterEach, mock, beforeEach } from 'bun:test';
 import { Command } from '@commander-js/extra-typings';
-
-class ExitError extends Error {
-  constructor(public code: number) { super(`process.exit(${code})`); }
-}
+import { ExitError, setNonInteractive, mockExitThrow } from '../helpers';
 
 // Mock resend SDK for doctor
 mock.module('resend', () => ({
@@ -51,11 +48,6 @@ describe('doctor command', () => {
     stderrSpy?.mockRestore();
     exitSpy?.mockRestore();
   });
-
-  function setNonInteractive() {
-    Object.defineProperty(process.stdin, 'isTTY', { value: undefined, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: undefined, writable: true });
-  }
 
   test('outputs JSON with --json flag', async () => {
     setNonInteractive();
@@ -157,9 +149,7 @@ describe('doctor command', () => {
     process.env.XDG_CONFIG_HOME = '/tmp/nonexistent-resend';
 
     logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    exitSpy = spyOn(process, 'exit').mockImplementation((code?: number) => {
-      throw new ExitError(code ?? 0);
-    });
+    exitSpy = mockExitThrow();
     stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
 
     const program = await createDoctorProgram();

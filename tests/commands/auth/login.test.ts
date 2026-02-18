@@ -2,10 +2,7 @@ import { describe, test, expect, spyOn, afterEach, mock, beforeEach } from 'bun:
 import { mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-
-class ExitError extends Error {
-  constructor(public code: number) { super(`process.exit(${code})`); }
-}
+import { ExitError, setNonInteractive, mockExitThrow } from '../../helpers';
 
 // Mock the Resend SDK
 mock.module('resend', () => ({
@@ -27,17 +24,6 @@ describe('login command', () => {
   let stderrSpy: ReturnType<typeof spyOn>;
   let logSpy: ReturnType<typeof spyOn>;
 
-  function setNonInteractive() {
-    Object.defineProperty(process.stdin, 'isTTY', { value: undefined, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: undefined, writable: true });
-  }
-
-  function mockExitThrow() {
-    exitSpy = spyOn(process, 'exit').mockImplementation((code?: number) => {
-      throw new ExitError(code ?? 0);
-    });
-  }
-
   beforeEach(() => {
     tmpDir = join(tmpdir(), `resend-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(tmpDir, { recursive: true });
@@ -58,7 +44,7 @@ describe('login command', () => {
   test('rejects key not starting with re_', async () => {
     setNonInteractive();
     errorSpy = spyOn(console, 'error').mockImplementation(() => {});
-    mockExitThrow();
+    exitSpy = mockExitThrow();
 
     const { loginCommand } = await import('../../../src/commands/auth/login');
     try {
@@ -86,7 +72,7 @@ describe('login command', () => {
   test('requires --key in non-interactive mode', async () => {
     setNonInteractive();
     errorSpy = spyOn(console, 'error').mockImplementation(() => {});
-    mockExitThrow();
+    exitSpy = mockExitThrow();
 
     const { loginCommand } = await import('../../../src/commands/auth/login');
     try {

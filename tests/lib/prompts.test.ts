@@ -1,11 +1,5 @@
 import { describe, test, expect, spyOn, afterEach } from 'bun:test';
-
-// Custom error to detect process.exit calls without actually exiting
-class ExitError extends Error {
-  constructor(public code: number) {
-    super(`process.exit(${code})`);
-  }
-}
+import { ExitError } from '../helpers';
 
 describe('promptForMissing', () => {
   const originalStdinIsTTY = process.stdin.isTTY;

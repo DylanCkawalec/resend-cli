@@ -1,9 +1,6 @@
 import { describe, test, expect, spyOn, afterEach, mock, beforeEach } from 'bun:test';
 import { join } from 'node:path';
-
-class ExitError extends Error {
-  constructor(public code: number) { super(`process.exit(${code})`); }
-}
+import { ExitError, setNonInteractive, mockExitThrow } from '../../helpers';
 
 const mockSend = mock(async () => ({
   data: { id: 'test-email-id-123' },
@@ -31,17 +28,6 @@ describe('send command', () => {
   let errorSpy: ReturnType<typeof spyOn>;
   let exitSpy: ReturnType<typeof spyOn>;
   let stderrSpy: ReturnType<typeof spyOn>;
-
-  function setNonInteractive() {
-    Object.defineProperty(process.stdin, 'isTTY', { value: undefined, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: undefined, writable: true });
-  }
-
-  function mockExitThrow() {
-    exitSpy = spyOn(process, 'exit').mockImplementation((code?: number) => {
-      throw new ExitError(code ?? 0);
-    });
-  }
 
   beforeEach(() => {
     process.env.RESEND_API_KEY = 're_test_key';
@@ -130,7 +116,7 @@ describe('send command', () => {
     delete process.env.RESEND_API_KEY;
     process.env.XDG_CONFIG_HOME = '/tmp/nonexistent-resend';
     errorSpy = spyOn(console, 'error').mockImplementation(() => {});
-    mockExitThrow();
+    exitSpy = mockExitThrow();
 
     const { sendCommand } = await import('../../../src/commands/emails/send');
     try {
@@ -148,7 +134,7 @@ describe('send command', () => {
   test('errors listing missing flags in non-interactive mode', async () => {
     setNonInteractive();
     errorSpy = spyOn(console, 'error').mockImplementation(() => {});
-    mockExitThrow();
+    exitSpy = mockExitThrow();
 
     const { sendCommand } = await import('../../../src/commands/emails/send');
     try {
@@ -166,7 +152,7 @@ describe('send command', () => {
   test('errors when no body and non-interactive', async () => {
     setNonInteractive();
     errorSpy = spyOn(console, 'error').mockImplementation(() => {});
-    mockExitThrow();
+    exitSpy = mockExitThrow();
 
     const { sendCommand } = await import('../../../src/commands/emails/send');
     try {
