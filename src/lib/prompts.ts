@@ -9,6 +9,11 @@ export interface FieldSpec {
   validate?: (value: string | undefined) => string | undefined;
 }
 
+export function cancelAndExit(message: string): never {
+  p.cancel(message);
+  process.exit(0);
+}
+
 export async function promptForMissing<T extends Record<string, string | undefined>>(
   current: T,
   fields: FieldSpec[]
@@ -37,10 +42,7 @@ export async function promptForMissing<T extends Record<string, string | undefin
       ])
     ),
     {
-      onCancel: () => {
-        p.cancel('Operation cancelled.');
-        process.exit(0);
-      },
+      onCancel: () => cancelAndExit('Operation cancelled.'),
     }
   );
 
