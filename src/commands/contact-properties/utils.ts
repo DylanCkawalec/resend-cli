@@ -5,7 +5,7 @@ export function renderContactPropertiesTable(props: ContactProperty[]): string {
   const rows = props.map((prop) => [
     prop.key,
     prop.type,
-    prop.fallbackValue !== null && prop.fallbackValue !== undefined ? String(prop.fallbackValue) : '',
+    prop.fallbackValue != null ? String(prop.fallbackValue) : '',
     prop.id,
     prop.createdAt,
   ]);
