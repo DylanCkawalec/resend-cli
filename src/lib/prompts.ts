@@ -38,7 +38,8 @@ export async function confirmDelete(
 
 export async function promptForMissing<T extends Record<string, string | undefined>>(
   current: T,
-  fields: FieldSpec[]
+  fields: FieldSpec[],
+  globalOpts: GlobalOpts
 ): Promise<T> {
   const missing = fields.filter((f) => f.required !== false && !current[f.flag]);
 
@@ -46,9 +47,10 @@ export async function promptForMissing<T extends Record<string, string | undefin
 
   if (!isInteractive()) {
     const flags = missing.map((f) => `--${f.flag}`).join(', ');
-    console.error(`Error: Missing required flags: ${flags}`);
-    console.error('Provide all required flags in non-interactive mode.');
-    process.exit(1);
+    outputError(
+      { message: `Missing required flags: ${flags}`, code: 'missing_flags' },
+      { json: globalOpts.json }
+    );
   }
 
   const result = await p.group(

@@ -111,7 +111,8 @@ Examples:
         { flag: 'from', message: 'From address', placeholder: 'you@example.com' },
         { flag: 'to', message: 'To address', placeholder: 'recipient@example.com' },
         { flag: 'subject', message: 'Subject', placeholder: 'Hello!' },
-      ]
+      ],
+      globalOpts
     );
 
     let html = opts.html;

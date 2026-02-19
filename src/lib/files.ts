@@ -6,10 +6,7 @@ function readFileContent(filePath: string, errorMsg: string, globalOpts: GlobalO
   try {
     return readFileSync(filePath, 'utf-8');
   } catch {
-    outputError(
-      { message: errorMsg, code: 'file_read_error' },
-      { json: globalOpts.json }
-    );
+    outputError({ message: errorMsg, code: 'file_read_error' }, { json: globalOpts.json });
   }
 }
 
