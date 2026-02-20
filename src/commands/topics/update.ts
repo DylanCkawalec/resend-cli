@@ -63,7 +63,7 @@ Examples:
       if (!globalOpts.json && isInteractive()) {
         console.log(`Topic updated: ${id}`);
       } else {
-        outputResult(data, { json: globalOpts.json });
+        outputResult(data!, { json: globalOpts.json });
       }
     } catch (err) {
       spinner.fail('Failed to update topic');

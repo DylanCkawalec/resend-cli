@@ -69,7 +69,7 @@ Examples:
         console.log(`\nSegment created: ${d.id}`);
         console.log(`Name: ${d.name}`);
       } else {
-        outputResult(data, { json: globalOpts.json });
+        outputResult(data!, { json: globalOpts.json });
       }
     } catch (err) {
       spinner.fail('Failed to create segment');

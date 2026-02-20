@@ -53,7 +53,7 @@ Examples:
         console.log(`Events:  ${(d.events ?? []).join(', ') || '(none)'}`);
         console.log(`Created: ${d.created_at}`);
       } else {
-        outputResult(data, { json: globalOpts.json });
+        outputResult(data!, { json: globalOpts.json });
       }
     } catch (err) {
       spinner.fail('Failed to fetch webhook');

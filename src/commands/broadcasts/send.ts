@@ -61,7 +61,7 @@ Examples:
           console.log(`\nBroadcast sent: ${d.id}`);
         }
       } else {
-        outputResult(data, { json: globalOpts.json });
+        outputResult(data!, { json: globalOpts.json });
       }
     } catch (err) {
       spinner.fail('Failed to send broadcast');

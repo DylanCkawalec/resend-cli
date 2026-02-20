@@ -123,7 +123,7 @@ Examples:
 
       spinner.stop('Batch sent');
 
-      const emailIds = data.data;
+      const emailIds = data!.data;
       if (!globalOpts.json && isInteractive()) {
         console.log(`Sent ${emailIds.length} email${emailIds.length === 1 ? '' : 's'}`);
         for (const email of emailIds) {

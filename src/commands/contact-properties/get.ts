@@ -56,7 +56,7 @@ Examples:
         console.log(`Created: ${d.createdAt}`);
         console.log(`Fallback value: ${d.fallbackValue ?? '(none)'}`);
       } else {
-        outputResult(data, { json: globalOpts.json });
+        outputResult(data!, { json: globalOpts.json });
       }
     } catch (err) {
       spinner.fail('Failed to fetch contact property');

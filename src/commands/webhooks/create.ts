@@ -117,7 +117,7 @@ Examples:
         console.log(`Signing Secret: ${d.signing_secret}`);
         console.log(`\nSave the signing secret — it is only shown once.`);
       } else {
-        outputResult(data, { json: globalOpts.json });
+        outputResult(data!, { json: globalOpts.json });
       }
     } catch (err) {
       spinner.fail('Failed to create webhook');

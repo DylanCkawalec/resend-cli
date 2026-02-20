@@ -106,7 +106,7 @@ Examples:
       if (!globalOpts.json && isInteractive()) {
         console.log(`\nContact created: ${data!.id}`);
       } else {
-        outputResult(data, { json: globalOpts.json });
+        outputResult(data!, { json: globalOpts.json });
       }
     } catch (err) {
       spinner.fail('Failed to create contact');

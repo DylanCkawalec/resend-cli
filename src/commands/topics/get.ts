@@ -50,7 +50,7 @@ Examples:
         console.log(`Default subscription: ${d.default_subscription}`);
         console.log(`Created: ${d.created_at}`);
       } else {
-        outputResult(data, { json: globalOpts.json });
+        outputResult(data!, { json: globalOpts.json });
       }
     } catch (err) {
       spinner.fail('Failed to fetch topic');

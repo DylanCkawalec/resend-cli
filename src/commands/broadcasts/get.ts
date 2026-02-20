@@ -60,7 +60,7 @@ Examples:
         if (b.scheduled_at) console.log(`  Scheduled:   ${b.scheduled_at}`);
         if (b.sent_at) console.log(`  Sent:        ${b.sent_at}`);
       } else {
-        outputResult(data, { json: globalOpts.json });
+        outputResult(data!, { json: globalOpts.json });
       }
     } catch (err) {
       spinner.fail('Failed to fetch broadcast');

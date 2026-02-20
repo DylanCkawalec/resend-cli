@@ -85,7 +85,7 @@ Examples:
         const d = data!;
         console.log(`\nTopic created: ${d.id}`);
       } else {
-        outputResult(data, { json: globalOpts.json });
+        outputResult(data!, { json: globalOpts.json });
       }
     } catch (err) {
       spinner.fail('Failed to create topic');

@@ -80,7 +80,7 @@ Examples:
       if (!globalOpts.json && isInteractive()) {
         console.log(`Webhook updated: ${id}`);
       } else {
-        outputResult(data, { json: globalOpts.json });
+        outputResult(data!, { json: globalOpts.json });
       }
     } catch (err) {
       spinner.fail('Failed to update webhook');
