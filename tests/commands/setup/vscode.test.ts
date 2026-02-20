@@ -5,12 +5,16 @@ const mockWriteFileSync = mock(() => {});
 const mockMkdirSync = mock(() => {});
 const mockReadFileSync = mock(() => JSON.stringify({ servers: { other: { type: 'stdio', command: 'other', args: [] } } }));
 const mockExistsSync = mock(() => true);
+const mockReaddirSync = mock(() => []);
+const mockLstatSync = mock(() => ({ isDirectory: () => false }));
 
 mock.module('node:fs', () => ({
   existsSync: mockExistsSync,
   readFileSync: mockReadFileSync,
   writeFileSync: mockWriteFileSync,
   mkdirSync: mockMkdirSync,
+  readdirSync: mockReaddirSync,
+  lstatSync: mockLstatSync,
 }));
 
 describe('setupVscode', () => {

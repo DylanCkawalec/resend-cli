@@ -8,11 +8,15 @@ const mockWriteFileSync = mock(() => {});
 const mockMkdirSync = mock(() => {});
 const mockReadFileSync = mock(() => '{}');
 const mockExistsSync = mock(() => false);
+const mockReaddirSync = mock(() => []);
+const mockLstatSync = mock(() => ({ isDirectory: () => false }));
 mock.module('node:fs', () => ({
   existsSync: mockExistsSync,
   readFileSync: mockReadFileSync,
   writeFileSync: mockWriteFileSync,
   mkdirSync: mockMkdirSync,
+  readdirSync: mockReaddirSync,
+  lstatSync: mockLstatSync,
 }));
 
 describe('setupClaudeCode', () => {

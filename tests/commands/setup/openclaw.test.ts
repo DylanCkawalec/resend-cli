@@ -3,9 +3,15 @@ import { captureTestEnv, setupOutputSpies, mockExitThrow, expectExit1 } from '..
 
 const mockWriteFileSync = mock(() => {});
 const mockMkdirSync = mock(() => {});
+const mockReaddirSync = mock(() => []);
+const mockLstatSync = mock(() => ({ isDirectory: () => false }));
 mock.module('node:fs', () => ({
   mkdirSync: mockMkdirSync,
   writeFileSync: mockWriteFileSync,
+  existsSync: mock(() => false),
+  readFileSync: mock(() => '{}'),
+  readdirSync: mockReaddirSync,
+  lstatSync: mockLstatSync,
 }));
 
 describe('setupOpenclaw', () => {

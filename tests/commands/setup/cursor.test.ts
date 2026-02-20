@@ -1,16 +1,20 @@
-import { describe, test, expect, mock, afterEach, spyOn } from 'bun:test';
+import { describe, test, expect, mock, spyOn, afterEach } from 'bun:test';
 import { captureTestEnv, setupOutputSpies, mockExitThrow, expectExit1 } from '../../helpers';
 
 const mockWriteFileSync = mock(() => {});
 const mockMkdirSync = mock(() => {});
 const mockReadFileSync = mock(() => JSON.stringify({ mcpServers: { other: { command: 'other' } } }));
 const mockExistsSync = mock(() => true);
+const mockReaddirSync = mock(() => []);
+const mockLstatSync = mock(() => ({ isDirectory: () => false }));
 
 mock.module('node:fs', () => ({
   existsSync: mockExistsSync,
   readFileSync: mockReadFileSync,
   writeFileSync: mockWriteFileSync,
   mkdirSync: mockMkdirSync,
+  readdirSync: mockReaddirSync,
+  lstatSync: mockLstatSync,
 }));
 
 describe('setupCursor', () => {

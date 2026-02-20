@@ -1,33 +1,21 @@
 import { describe, test, expect, mock, spyOn, afterEach } from 'bun:test';
 import { captureTestEnv, setNonInteractive, mockExitThrow, expectExit1 } from '../../helpers';
 
-// Mock all subcommand modules so index.ts can be imported without touching node:fs
-const mockSetupCursor = mock(async () => {});
-const mockSetupClaudeDesktop = mock(async () => {});
-const mockSetupClaudeCode = mock(async () => {});
-const mockSetupVscode = mock(async () => {});
-const mockSetupOpenclaw = mock(async () => {});
+// Provide a complete node:fs mock so @clack/prompts (which imports readdirSync
+// and lstatSync) does not fail when this file runs after another test file that
+// only partially mocked node:fs.
+mock.module('node:fs', () => ({
+  existsSync: mock(() => false),
+  readFileSync: mock(() => '{}'),
+  writeFileSync: mock(() => {}),
+  mkdirSync: mock(() => {}),
+  readdirSync: mock(() => []),
+  lstatSync: mock(() => ({ isDirectory: () => false })),
+}));
 
-mock.module('../../../src/commands/setup/cursor', () => ({
-  setupCursor: mockSetupCursor,
-  cursorCommand: new (require('@commander-js/extra-typings').Command)('cursor'),
-}));
-mock.module('../../../src/commands/setup/claude-desktop', () => ({
-  setupClaudeDesktop: mockSetupClaudeDesktop,
-  claudeDesktopCommand: new (require('@commander-js/extra-typings').Command)('claude-desktop'),
-}));
-mock.module('../../../src/commands/setup/claude-code', () => ({
-  setupClaudeCode: mockSetupClaudeCode,
-  claudeCodeCommand: new (require('@commander-js/extra-typings').Command)('claude-code'),
-}));
-mock.module('../../../src/commands/setup/vscode', () => ({
-  setupVscode: mockSetupVscode,
-  vscodeCommand: new (require('@commander-js/extra-typings').Command)('vscode'),
-}));
-mock.module('../../../src/commands/setup/openclaw', () => ({
-  setupOpenclaw: mockSetupOpenclaw,
-  openclawCommand: new (require('@commander-js/extra-typings').Command)('openclaw'),
-}));
+// No mock.module for subcommand modules — the real source files are used.
+// The tests here only exercise the parent command's non-interactive guard and
+// subcommand registration; no subcommand action function is invoked.
 
 describe('setup index — non-interactive guard', () => {
   const restoreEnv = captureTestEnv();
