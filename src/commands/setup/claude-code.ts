@@ -21,7 +21,7 @@ export async function setupClaudeCode(globalOpts: GlobalOpts): Promise<void> {
       (err as NodeJS.ErrnoException).code === 'ENOENT';
 
     if (!isNotFound) {
-      outputError(
+      return outputError(
         {
           message: `claude mcp add failed: ${errorMessage(err, 'unknown error')}`,
           code: 'claude_mcp_add_failed',

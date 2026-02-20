@@ -76,7 +76,7 @@ Examples:
       process.platform === 'darwin'
         ? join(home, 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json')
         : process.platform === 'win32'
-          ? join(process.env.APPDATA ?? '', 'Claude', 'claude_desktop_config.json')
+          ? join(process.env.APPDATA ?? home, 'Claude', 'claude_desktop_config.json')
           : join(home, '.config', 'Claude', 'claude_desktop_config.json');
 
     const candidates = [
