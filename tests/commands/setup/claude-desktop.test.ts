@@ -25,26 +25,32 @@ describe('setupClaudeDesktop', () => {
 
   test('merges resend into mcpServers preserving existing top-level keys', async () => {
     const { restore } = setupOutputSpies();
-    const { setupClaudeDesktop } = await import('../../../src/commands/setup/claude-desktop');
-    await setupClaudeDesktop({ json: true });
+    try {
+      const { setupClaudeDesktop } = await import('../../../src/commands/setup/claude-desktop');
+      await setupClaudeDesktop({ json: true });
 
-    const written = JSON.parse(mockWriteFileSync.mock.calls[0][1] as string);
-    expect(written.preferences).toBeDefined();
-    expect(written.mcpServers.resend.command).toBe('resend');
-    expect(written.mcpServers.resend.args).toEqual(['mcp', 'serve']);
-    restore();
+      const written = JSON.parse(mockWriteFileSync.mock.calls[0][1] as string);
+      expect(written.preferences).toBeDefined();
+      expect(written.mcpServers.resend.command).toBe('resend');
+      expect(written.mcpServers.resend.args).toEqual(['mcp', 'serve']);
+    } finally {
+      restore();
+    }
   });
 
   test('outputs JSON with configured:true and tool:claude-desktop', async () => {
     const { logSpy, restore } = setupOutputSpies();
-    const { setupClaudeDesktop } = await import('../../../src/commands/setup/claude-desktop');
-    await setupClaudeDesktop({ json: true });
+    try {
+      const { setupClaudeDesktop } = await import('../../../src/commands/setup/claude-desktop');
+      await setupClaudeDesktop({ json: true });
 
-    const output = JSON.parse(logSpy.mock.calls[0][0] as string);
-    expect(output.configured).toBe(true);
-    expect(output.tool).toBe('claude-desktop');
-    expect(output.config_path).toBeDefined();
-    restore();
+      const output = JSON.parse(logSpy.mock.calls[0][0] as string);
+      expect(output.configured).toBe(true);
+      expect(output.tool).toBe('claude-desktop');
+      expect(output.config_path).toBeDefined();
+    } finally {
+      restore();
+    }
   });
 
   test('calls outputError with config_write_error on failure', async () => {
