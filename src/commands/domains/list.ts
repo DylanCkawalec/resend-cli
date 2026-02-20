@@ -16,7 +16,8 @@ export const listDomainsCommand = new Command('list')
   .addHelpText(
     'after',
     buildHelpText({
-      output: '  {"object":"list","data":[...],"has_more":true}',
+      output:
+        '  {"object":"list","data":[...],"has_more":true}\n  The list response does not include DNS records — use "resend domains get <id>" for that.',
       errorCodes: ['auth_error', 'invalid_limit', 'list_error'],
       examples: [
         'resend domains list',
