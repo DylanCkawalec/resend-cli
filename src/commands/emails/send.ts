@@ -5,7 +5,7 @@ import { requireClient } from '../../lib/client';
 import { promptForMissing, cancelAndExit } from '../../lib/prompts';
 import { createSpinner } from '../../lib/spinner';
 import { outputError, outputResult, errorMessage } from '../../lib/output';
-import { readHtmlFile } from '../../lib/files';
+import { readFile } from '../../lib/files';
 import { isInteractive } from '../../lib/tty';
 import * as p from '@clack/prompts';
 
@@ -119,7 +119,7 @@ Examples:
     const text = opts.text;
 
     if (opts.htmlFile) {
-      html = readHtmlFile(opts.htmlFile, globalOpts);
+      html = readFile(opts.htmlFile, globalOpts);
     }
 
     let body: string | undefined = text;
@@ -163,7 +163,7 @@ Examples:
       }
 
       spinner.stop('Email sent');
-      outputResult(data, { json: globalOpts.json });
+      outputResult(data!, { json: globalOpts.json });
     } catch (err) {
       spinner.fail('Failed to send email');
       outputError(

@@ -3,7 +3,7 @@ import type { GlobalOpts } from '../../lib/client';
 import { requireClient } from '../../lib/client';
 import { createSpinner } from '../../lib/spinner';
 import { outputError, outputResult, errorMessage } from '../../lib/output';
-import { readHtmlFile } from '../../lib/files';
+import { readFile } from '../../lib/files';
 import { isInteractive } from '../../lib/tty';
 
 export const updateBroadcastCommand = new Command('update')
@@ -55,7 +55,7 @@ Examples:
     let html = opts.html;
 
     if (opts.htmlFile) {
-      html = readHtmlFile(opts.htmlFile, globalOpts);
+      html = readFile(opts.htmlFile, globalOpts);
     }
 
     const spinner = createSpinner('Updating broadcast...');
@@ -79,7 +79,7 @@ Examples:
       if (!globalOpts.json && isInteractive()) {
         console.log(`\nBroadcast updated: ${data!.id}`);
       } else {
-        outputResult(data, { json: globalOpts.json });
+        outputResult(data!, { json: globalOpts.json });
       }
     } catch (err) {
       spinner.fail('Failed to update broadcast');

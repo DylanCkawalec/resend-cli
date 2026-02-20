@@ -6,7 +6,7 @@ import { requireClient } from '../../lib/client';
 import { cancelAndExit } from '../../lib/prompts';
 import { createSpinner } from '../../lib/spinner';
 import { outputError, outputResult, errorMessage } from '../../lib/output';
-import { readHtmlFile } from '../../lib/files';
+import { readFile } from '../../lib/files';
 import { isInteractive } from '../../lib/tty';
 
 export const createBroadcastCommand = new Command('create')
@@ -94,7 +94,7 @@ Examples:
     let text = opts.text;
 
     if (opts.htmlFile) {
-      html = readHtmlFile(opts.htmlFile, globalOpts);
+      html = readFile(opts.htmlFile, globalOpts);
     }
 
     if (!html && !text) {
@@ -143,7 +143,7 @@ Examples:
           console.log(`\nSend it with: resend broadcasts send ${d.id}`);
         }
       } else {
-        outputResult(data, { json: globalOpts.json });
+        outputResult(data!, { json: globalOpts.json });
       }
     } catch (err) {
       spinner.fail('Failed to create broadcast');
