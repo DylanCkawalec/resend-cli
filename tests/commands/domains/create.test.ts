@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn, afterEach, mock, beforeEach } from 'bun:test';
-import { ExitError, setNonInteractive, mockExitThrow } from '../../helpers';
+import { setNonInteractive, mockExitThrow, captureTestEnv, setupOutputSpies, expectExit1 } from '../../helpers';
 
 const mockCreate = mock(async () => ({
   data: {
@@ -24,13 +24,11 @@ mock.module('resend', () => ({
 }));
 
 describe('domains create command', () => {
-  const originalEnv = { ...process.env };
-  const originalStdinIsTTY = process.stdin.isTTY;
-  const originalStdoutIsTTY = process.stdout.isTTY;
-  let logSpy: ReturnType<typeof spyOn>;
-  let errorSpy: ReturnType<typeof spyOn>;
-  let exitSpy: ReturnType<typeof spyOn>;
-  let stderrSpy: ReturnType<typeof spyOn>;
+  const restoreEnv = captureTestEnv();
+  let spies: ReturnType<typeof setupOutputSpies> | undefined;
+  let errorSpy: ReturnType<typeof spyOn> | undefined;
+  let stderrSpy: ReturnType<typeof spyOn> | undefined;
+  let exitSpy: ReturnType<typeof spyOn> | undefined;
 
   beforeEach(() => {
     process.env.RESEND_API_KEY = 're_test_key';
@@ -38,19 +36,19 @@ describe('domains create command', () => {
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, writable: true });
-    logSpy?.mockRestore();
+    restoreEnv();
+    spies?.restore();
     errorSpy?.mockRestore();
-    exitSpy?.mockRestore();
     stderrSpy?.mockRestore();
+    exitSpy?.mockRestore();
+    spies = undefined;
+    errorSpy = undefined;
+    stderrSpy = undefined;
+    exitSpy = undefined;
   });
 
   test('creates domain with --name flag', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { createDomainCommand } = await import('../../../src/commands/domains/create');
     await createDomainCommand.parseAsync(['--name', 'example.com'], { from: 'user' });
@@ -61,9 +59,7 @@ describe('domains create command', () => {
   });
 
   test('passes region and tls flags to SDK', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { createDomainCommand } = await import('../../../src/commands/domains/create');
     await createDomainCommand.parseAsync(
@@ -77,9 +73,7 @@ describe('domains create command', () => {
   });
 
   test('passes receiving capability when --receiving flag is set', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { createDomainCommand } = await import('../../../src/commands/domains/create');
     await createDomainCommand.parseAsync(['--name', 'example.com', '--receiving'], { from: 'user' });
@@ -89,14 +83,12 @@ describe('domains create command', () => {
   });
 
   test('outputs JSON result when non-interactive', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { createDomainCommand } = await import('../../../src/commands/domains/create');
     await createDomainCommand.parseAsync(['--name', 'example.com'], { from: 'user' });
 
-    const output = logSpy.mock.calls[0][0] as string;
+    const output = spies.logSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
     expect(parsed.id).toBe('test-domain-id');
     expect(parsed.name).toBe('example.com');
@@ -108,13 +100,7 @@ describe('domains create command', () => {
     exitSpy = mockExitThrow();
 
     const { createDomainCommand } = await import('../../../src/commands/domains/create');
-    try {
-      await createDomainCommand.parseAsync([], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => createDomainCommand.parseAsync([], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('missing_name');
@@ -128,13 +114,7 @@ describe('domains create command', () => {
     exitSpy = mockExitThrow();
 
     const { createDomainCommand } = await import('../../../src/commands/domains/create');
-    try {
-      await createDomainCommand.parseAsync(['--name', 'example.com'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => createDomainCommand.parseAsync(['--name', 'example.com'], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('auth_error');
@@ -148,13 +128,7 @@ describe('domains create command', () => {
     exitSpy = mockExitThrow();
 
     const { createDomainCommand } = await import('../../../src/commands/domains/create');
-    try {
-      await createDomainCommand.parseAsync(['--name', 'example.com'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => createDomainCommand.parseAsync(['--name', 'example.com'], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('create_error');

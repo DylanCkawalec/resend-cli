@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn, afterEach, mock, beforeEach } from 'bun:test';
-import { ExitError, setNonInteractive, mockExitThrow } from '../../helpers';
+import { setNonInteractive, mockExitThrow, captureTestEnv, setupOutputSpies, expectExit1 } from '../../helpers';
 
 const mockSend = mock(async () => ({
   data: { id: 'bcast_abc123' },
@@ -14,13 +14,11 @@ mock.module('resend', () => ({
 }));
 
 describe('broadcasts send command', () => {
-  const originalEnv = { ...process.env };
-  const originalStdinIsTTY = process.stdin.isTTY;
-  const originalStdoutIsTTY = process.stdout.isTTY;
-  let logSpy: ReturnType<typeof spyOn>;
-  let errorSpy: ReturnType<typeof spyOn>;
-  let exitSpy: ReturnType<typeof spyOn>;
-  let stderrSpy: ReturnType<typeof spyOn>;
+  const restoreEnv = captureTestEnv();
+  let spies: ReturnType<typeof setupOutputSpies> | undefined;
+  let errorSpy: ReturnType<typeof spyOn> | undefined;
+  let stderrSpy: ReturnType<typeof spyOn> | undefined;
+  let exitSpy: ReturnType<typeof spyOn> | undefined;
 
   beforeEach(() => {
     process.env.RESEND_API_KEY = 're_test_key';
@@ -28,19 +26,19 @@ describe('broadcasts send command', () => {
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, writable: true });
-    logSpy?.mockRestore();
+    restoreEnv();
+    spies?.restore();
     errorSpy?.mockRestore();
-    exitSpy?.mockRestore();
     stderrSpy?.mockRestore();
+    exitSpy?.mockRestore();
+    spies = undefined;
+    errorSpy = undefined;
+    stderrSpy = undefined;
+    exitSpy = undefined;
   });
 
   test('sends broadcast by id', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { sendBroadcastCommand } = await import('../../../src/commands/broadcasts/send');
     await sendBroadcastCommand.parseAsync(['bcast_abc123'], { from: 'user' });
@@ -50,22 +48,18 @@ describe('broadcasts send command', () => {
   });
 
   test('outputs JSON id when non-interactive', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { sendBroadcastCommand } = await import('../../../src/commands/broadcasts/send');
     await sendBroadcastCommand.parseAsync(['bcast_abc123'], { from: 'user' });
 
-    const output = logSpy.mock.calls[0][0] as string;
+    const output = spies.logSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
     expect(parsed.id).toBe('bcast_abc123');
   });
 
   test('passes --scheduled-at to SDK', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { sendBroadcastCommand } = await import('../../../src/commands/broadcasts/send');
     await sendBroadcastCommand.parseAsync(['bcast_abc123', '--scheduled-at', 'in 1 hour'], { from: 'user' });
@@ -75,9 +69,7 @@ describe('broadcasts send command', () => {
   });
 
   test('does not pass scheduledAt when flag absent', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { sendBroadcastCommand } = await import('../../../src/commands/broadcasts/send');
     await sendBroadcastCommand.parseAsync(['bcast_abc123'], { from: 'user' });
@@ -94,13 +86,7 @@ describe('broadcasts send command', () => {
     exitSpy = mockExitThrow();
 
     const { sendBroadcastCommand } = await import('../../../src/commands/broadcasts/send');
-    try {
-      await sendBroadcastCommand.parseAsync(['bcast_abc123'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => sendBroadcastCommand.parseAsync(['bcast_abc123'], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('auth_error');
@@ -114,13 +100,7 @@ describe('broadcasts send command', () => {
     exitSpy = mockExitThrow();
 
     const { sendBroadcastCommand } = await import('../../../src/commands/broadcasts/send');
-    try {
-      await sendBroadcastCommand.parseAsync(['bcast_bad'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => sendBroadcastCommand.parseAsync(['bcast_bad'], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('send_error');

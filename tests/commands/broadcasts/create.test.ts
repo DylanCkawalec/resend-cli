@@ -1,7 +1,7 @@
 import { describe, test, expect, spyOn, afterEach, mock, beforeEach } from 'bun:test';
 import { writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { ExitError, setNonInteractive, mockExitThrow } from '../../helpers';
+import { setNonInteractive, mockExitThrow, captureTestEnv, setupOutputSpies, expectExit1 } from '../../helpers';
 
 const mockCreate = mock(async () => ({
   data: { id: 'bcast_abc123' },
@@ -16,13 +16,11 @@ mock.module('resend', () => ({
 }));
 
 describe('broadcasts create command', () => {
-  const originalEnv = { ...process.env };
-  const originalStdinIsTTY = process.stdin.isTTY;
-  const originalStdoutIsTTY = process.stdout.isTTY;
-  let logSpy: ReturnType<typeof spyOn>;
-  let errorSpy: ReturnType<typeof spyOn>;
-  let exitSpy: ReturnType<typeof spyOn>;
-  let stderrSpy: ReturnType<typeof spyOn>;
+  const restoreEnv = captureTestEnv();
+  let spies: ReturnType<typeof setupOutputSpies> | undefined;
+  let errorSpy: ReturnType<typeof spyOn> | undefined;
+  let stderrSpy: ReturnType<typeof spyOn> | undefined;
+  let exitSpy: ReturnType<typeof spyOn> | undefined;
 
   beforeEach(() => {
     process.env.RESEND_API_KEY = 're_test_key';
@@ -30,19 +28,19 @@ describe('broadcasts create command', () => {
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, writable: true });
-    logSpy?.mockRestore();
+    restoreEnv();
+    spies?.restore();
     errorSpy?.mockRestore();
-    exitSpy?.mockRestore();
     stderrSpy?.mockRestore();
+    exitSpy?.mockRestore();
+    spies = undefined;
+    errorSpy = undefined;
+    stderrSpy = undefined;
+    exitSpy = undefined;
   });
 
   test('creates broadcast with required flags', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { createBroadcastCommand } = await import('../../../src/commands/broadcasts/create');
     await createBroadcastCommand.parseAsync(
@@ -59,9 +57,7 @@ describe('broadcasts create command', () => {
   });
 
   test('outputs JSON id when non-interactive', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { createBroadcastCommand } = await import('../../../src/commands/broadcasts/create');
     await createBroadcastCommand.parseAsync(
@@ -69,15 +65,13 @@ describe('broadcasts create command', () => {
       { from: 'user' }
     );
 
-    const output = logSpy.mock.calls[0][0] as string;
+    const output = spies.logSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
     expect(parsed.id).toBe('bcast_abc123');
   });
 
   test('passes --send flag to SDK', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { createBroadcastCommand } = await import('../../../src/commands/broadcasts/create');
     await createBroadcastCommand.parseAsync(
@@ -90,9 +84,7 @@ describe('broadcasts create command', () => {
   });
 
   test('passes --scheduled-at with --send to SDK', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { createBroadcastCommand } = await import('../../../src/commands/broadcasts/create');
     await createBroadcastCommand.parseAsync(
@@ -105,9 +97,7 @@ describe('broadcasts create command', () => {
   });
 
   test('passes optional flags to SDK', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { createBroadcastCommand } = await import('../../../src/commands/broadcasts/create');
     await createBroadcastCommand.parseAsync(
@@ -137,16 +127,10 @@ describe('broadcasts create command', () => {
     exitSpy = mockExitThrow();
 
     const { createBroadcastCommand } = await import('../../../src/commands/broadcasts/create');
-    try {
-      await createBroadcastCommand.parseAsync(
-        ['--subject', 'News', '--segment-id', 'seg_123', '--html', '<p>Hi</p>'],
-        { from: 'user' }
-      );
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => createBroadcastCommand.parseAsync(
+      ['--subject', 'News', '--segment-id', 'seg_123', '--html', '<p>Hi</p>'],
+      { from: 'user' }
+    ));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('missing_from');
@@ -158,16 +142,10 @@ describe('broadcasts create command', () => {
     exitSpy = mockExitThrow();
 
     const { createBroadcastCommand } = await import('../../../src/commands/broadcasts/create');
-    try {
-      await createBroadcastCommand.parseAsync(
-        ['--from', 'hello@domain.com', '--segment-id', 'seg_123', '--html', '<p>Hi</p>'],
-        { from: 'user' }
-      );
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => createBroadcastCommand.parseAsync(
+      ['--from', 'hello@domain.com', '--segment-id', 'seg_123', '--html', '<p>Hi</p>'],
+      { from: 'user' }
+    ));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('missing_subject');
@@ -179,16 +157,10 @@ describe('broadcasts create command', () => {
     exitSpy = mockExitThrow();
 
     const { createBroadcastCommand } = await import('../../../src/commands/broadcasts/create');
-    try {
-      await createBroadcastCommand.parseAsync(
-        ['--from', 'hello@domain.com', '--subject', 'News', '--html', '<p>Hi</p>'],
-        { from: 'user' }
-      );
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => createBroadcastCommand.parseAsync(
+      ['--from', 'hello@domain.com', '--subject', 'News', '--html', '<p>Hi</p>'],
+      { from: 'user' }
+    ));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('missing_segment');
@@ -200,16 +172,10 @@ describe('broadcasts create command', () => {
     exitSpy = mockExitThrow();
 
     const { createBroadcastCommand } = await import('../../../src/commands/broadcasts/create');
-    try {
-      await createBroadcastCommand.parseAsync(
-        ['--from', 'hello@domain.com', '--subject', 'News', '--segment-id', 'seg_123'],
-        { from: 'user' }
-      );
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => createBroadcastCommand.parseAsync(
+      ['--from', 'hello@domain.com', '--subject', 'News', '--segment-id', 'seg_123'],
+      { from: 'user' }
+    ));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('missing_body');
@@ -223,16 +189,10 @@ describe('broadcasts create command', () => {
     exitSpy = mockExitThrow();
 
     const { createBroadcastCommand } = await import('../../../src/commands/broadcasts/create');
-    try {
-      await createBroadcastCommand.parseAsync(
-        ['--from', 'hello@domain.com', '--subject', 'News', '--segment-id', 'seg_123', '--html', '<p>Hi</p>'],
-        { from: 'user' }
-      );
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => createBroadcastCommand.parseAsync(
+      ['--from', 'hello@domain.com', '--subject', 'News', '--segment-id', 'seg_123', '--html', '<p>Hi</p>'],
+      { from: 'user' }
+    ));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('auth_error');
@@ -246,16 +206,10 @@ describe('broadcasts create command', () => {
     exitSpy = mockExitThrow();
 
     const { createBroadcastCommand } = await import('../../../src/commands/broadcasts/create');
-    try {
-      await createBroadcastCommand.parseAsync(
-        ['--from', 'hello@domain.com', '--subject', 'News', '--segment-id', 'seg_bad', '--html', '<p>Hi</p>'],
-        { from: 'user' }
-      );
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => createBroadcastCommand.parseAsync(
+      ['--from', 'hello@domain.com', '--subject', 'News', '--segment-id', 'seg_bad', '--html', '<p>Hi</p>'],
+      { from: 'user' }
+    ));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('create_error');
@@ -277,9 +231,7 @@ describe('broadcasts create command', () => {
   });
 
   test('reads html body from --html-file and passes it to SDK', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const tmpFile = join(import.meta.dir, 'tmp-broadcast.html');
     writeFileSync(tmpFile, '<p>From file</p>', 'utf-8');
@@ -304,16 +256,10 @@ describe('broadcasts create command', () => {
     exitSpy = mockExitThrow();
 
     const { createBroadcastCommand } = await import('../../../src/commands/broadcasts/create');
-    try {
-      await createBroadcastCommand.parseAsync(
-        ['--from', 'hello@domain.com', '--subject', 'News', '--segment-id', 'seg_123', '--html-file', '/nonexistent/file.html'],
-        { from: 'user' }
-      );
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => createBroadcastCommand.parseAsync(
+      ['--from', 'hello@domain.com', '--subject', 'News', '--segment-id', 'seg_123', '--html-file', '/nonexistent/file.html'],
+      { from: 'user' }
+    ));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('file_read_error');

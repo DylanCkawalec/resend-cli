@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn, afterEach, mock, beforeEach } from 'bun:test';
-import { ExitError, setNonInteractive, mockExitThrow } from '../../helpers';
+import { setNonInteractive, mockExitThrow, captureTestEnv, setupOutputSpies, expectExit1 } from '../../helpers';
 
 const mockList = mock(async () => ({
   data: {
@@ -20,13 +20,11 @@ mock.module('resend', () => ({
 }));
 
 describe('broadcasts list command', () => {
-  const originalEnv = { ...process.env };
-  const originalStdinIsTTY = process.stdin.isTTY;
-  const originalStdoutIsTTY = process.stdout.isTTY;
-  let logSpy: ReturnType<typeof spyOn>;
-  let errorSpy: ReturnType<typeof spyOn>;
-  let exitSpy: ReturnType<typeof spyOn>;
-  let stderrSpy: ReturnType<typeof spyOn>;
+  const restoreEnv = captureTestEnv();
+  let spies: ReturnType<typeof setupOutputSpies> | undefined;
+  let errorSpy: ReturnType<typeof spyOn> | undefined;
+  let stderrSpy: ReturnType<typeof spyOn> | undefined;
+  let exitSpy: ReturnType<typeof spyOn> | undefined;
 
   beforeEach(() => {
     process.env.RESEND_API_KEY = 're_test_key';
@@ -34,19 +32,19 @@ describe('broadcasts list command', () => {
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, writable: true });
-    logSpy?.mockRestore();
+    restoreEnv();
+    spies?.restore();
     errorSpy?.mockRestore();
-    exitSpy?.mockRestore();
     stderrSpy?.mockRestore();
+    exitSpy?.mockRestore();
+    spies = undefined;
+    errorSpy = undefined;
+    stderrSpy = undefined;
+    exitSpy = undefined;
   });
 
   test('lists broadcasts', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { listBroadcastsCommand } = await import('../../../src/commands/broadcasts/list');
     await listBroadcastsCommand.parseAsync([], { from: 'user' });
@@ -55,14 +53,12 @@ describe('broadcasts list command', () => {
   });
 
   test('outputs JSON list when non-interactive', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { listBroadcastsCommand } = await import('../../../src/commands/broadcasts/list');
     await listBroadcastsCommand.parseAsync([], { from: 'user' });
 
-    const output = logSpy.mock.calls[0][0] as string;
+    const output = spies.logSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
     expect(parsed.object).toBe('list');
     expect(parsed.data).toHaveLength(1);
@@ -70,9 +66,7 @@ describe('broadcasts list command', () => {
   });
 
   test('passes --limit to SDK', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { listBroadcastsCommand } = await import('../../../src/commands/broadcasts/list');
     await listBroadcastsCommand.parseAsync(['--limit', '5'], { from: 'user' });
@@ -82,9 +76,7 @@ describe('broadcasts list command', () => {
   });
 
   test('passes --after cursor to SDK', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { listBroadcastsCommand } = await import('../../../src/commands/broadcasts/list');
     await listBroadcastsCommand.parseAsync(['--after', 'bcast_cursor'], { from: 'user' });
@@ -94,9 +86,7 @@ describe('broadcasts list command', () => {
   });
 
   test('passes --before cursor to SDK', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { listBroadcastsCommand } = await import('../../../src/commands/broadcasts/list');
     await listBroadcastsCommand.parseAsync(['--before', 'bcast_cursor'], { from: 'user' });
@@ -112,13 +102,7 @@ describe('broadcasts list command', () => {
     exitSpy = mockExitThrow();
 
     const { listBroadcastsCommand } = await import('../../../src/commands/broadcasts/list');
-    try {
-      await listBroadcastsCommand.parseAsync(['--limit', '999'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => listBroadcastsCommand.parseAsync(['--limit', '999'], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('invalid_limit');
@@ -132,13 +116,7 @@ describe('broadcasts list command', () => {
     exitSpy = mockExitThrow();
 
     const { listBroadcastsCommand } = await import('../../../src/commands/broadcasts/list');
-    try {
-      await listBroadcastsCommand.parseAsync([], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => listBroadcastsCommand.parseAsync([], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('auth_error');
@@ -152,13 +130,7 @@ describe('broadcasts list command', () => {
     exitSpy = mockExitThrow();
 
     const { listBroadcastsCommand } = await import('../../../src/commands/broadcasts/list');
-    try {
-      await listBroadcastsCommand.parseAsync([], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => listBroadcastsCommand.parseAsync([], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('list_error');

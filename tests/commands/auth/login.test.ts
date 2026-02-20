@@ -2,7 +2,7 @@ import { describe, test, expect, spyOn, afterEach, mock, beforeEach } from 'bun:
 import { mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { ExitError, setNonInteractive, mockExitThrow } from '../../helpers';
+import { captureTestEnv, setupOutputSpies, expectExit1, mockExitThrow } from '../../helpers';
 
 // Mock the Resend SDK
 mock.module('resend', () => ({
@@ -15,14 +15,11 @@ mock.module('resend', () => ({
 }));
 
 describe('login command', () => {
-  const originalEnv = { ...process.env };
-  const originalStdinIsTTY = process.stdin.isTTY;
-  const originalStdoutIsTTY = process.stdout.isTTY;
+  const restoreEnv = captureTestEnv();
+  let spies: ReturnType<typeof setupOutputSpies> | undefined;
+  let errorSpy: ReturnType<typeof spyOn> | undefined;
+  let exitSpy: ReturnType<typeof spyOn> | undefined;
   let tmpDir: string;
-  let errorSpy: ReturnType<typeof spyOn>;
-  let exitSpy: ReturnType<typeof spyOn>;
-  let stderrSpy: ReturnType<typeof spyOn>;
-  let logSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
     tmpDir = join(tmpdir(), `resend-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -31,35 +28,26 @@ describe('login command', () => {
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, writable: true });
+    restoreEnv();
+    spies?.restore();
+    spies = undefined;
     errorSpy?.mockRestore();
+    errorSpy = undefined;
     exitSpy?.mockRestore();
-    stderrSpy?.mockRestore();
-    logSpy?.mockRestore();
+    exitSpy = undefined;
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
   test('rejects key not starting with re_', async () => {
-    setNonInteractive();
     errorSpy = spyOn(console, 'error').mockImplementation(() => {});
     exitSpy = mockExitThrow();
 
     const { loginCommand } = await import('../../../src/commands/auth/login');
-    try {
-      await loginCommand.parseAsync(['--key', 'bad_key'], { from: 'user' });
-      expect(true).toBe(false); // should not reach
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => loginCommand.parseAsync(['--key', 'bad_key'], { from: 'user' }));
   });
 
   test('stores valid key to credentials.json', async () => {
-    setNonInteractive();
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
+    spies = setupOutputSpies();
 
     const { loginCommand } = await import('../../../src/commands/auth/login');
     await loginCommand.parseAsync(['--key', 're_valid_test_key_123'], { from: 'user' });
@@ -70,20 +58,13 @@ describe('login command', () => {
   });
 
   test('requires --key in non-interactive mode', async () => {
-    setNonInteractive();
     errorSpy = spyOn(console, 'error').mockImplementation(() => {});
     exitSpy = mockExitThrow();
 
     const { loginCommand } = await import('../../../src/commands/auth/login');
-    try {
-      await loginCommand.parseAsync([], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => loginCommand.parseAsync([], { from: 'user' }));
 
-    const output = errorSpy.mock.calls[0][0] as string;
+    const output = errorSpy!.mock.calls[0][0] as string;
     expect(output).toContain('missing_key');
   });
 });

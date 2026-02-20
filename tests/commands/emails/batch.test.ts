@@ -1,6 +1,6 @@
 import { describe, test, expect, spyOn, afterEach, mock, beforeEach } from 'bun:test';
 import { join } from 'node:path';
-import { ExitError, setNonInteractive, mockExitThrow } from '../../helpers';
+import { setNonInteractive, mockExitThrow, captureTestEnv, setupOutputSpies, expectExit1 } from '../../helpers';
 
 const mockBatchSend = mock(async () => ({
   data: { data: [{ id: 'abc123' }, { id: 'def456' }] },
@@ -20,13 +20,11 @@ const VALID_EMAILS = [
 ];
 
 describe('batch command', () => {
-  const originalEnv = { ...process.env };
-  const originalStdinIsTTY = process.stdin.isTTY;
-  const originalStdoutIsTTY = process.stdout.isTTY;
-  let logSpy: ReturnType<typeof spyOn>;
-  let errorSpy: ReturnType<typeof spyOn>;
-  let exitSpy: ReturnType<typeof spyOn>;
-  let stderrSpy: ReturnType<typeof spyOn>;
+  const restoreEnv = captureTestEnv();
+  let spies: ReturnType<typeof setupOutputSpies> | undefined;
+  let errorSpy: ReturnType<typeof spyOn> | undefined;
+  let stderrSpy: ReturnType<typeof spyOn> | undefined;
+  let exitSpy: ReturnType<typeof spyOn> | undefined;
   let tmpFile: string;
 
   beforeEach(() => {
@@ -35,13 +33,15 @@ describe('batch command', () => {
   });
 
   afterEach(async () => {
-    process.env = { ...originalEnv };
-    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, writable: true });
-    logSpy?.mockRestore();
+    restoreEnv();
+    spies?.restore();
     errorSpy?.mockRestore();
-    exitSpy?.mockRestore();
     stderrSpy?.mockRestore();
+    exitSpy?.mockRestore();
+    spies = undefined;
+    errorSpy = undefined;
+    stderrSpy = undefined;
+    exitSpy = undefined;
     if (tmpFile) {
       const { unlinkSync } = require('node:fs');
       try { unlinkSync(tmpFile); } catch {}
@@ -57,9 +57,7 @@ describe('batch command', () => {
   }
 
   test('sends emails from a JSON file', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const file = await writeTmpJson(VALID_EMAILS);
     const { batchCommand } = await import('../../../src/commands/emails/batch');
@@ -72,15 +70,13 @@ describe('batch command', () => {
 
   test('outputs array of IDs on success in JSON mode', async () => {
     // Non-interactive mode (no TTY) automatically triggers JSON output via outputResult
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const file = await writeTmpJson(VALID_EMAILS);
     const { batchCommand } = await import('../../../src/commands/emails/batch');
     await batchCommand.parseAsync(['--file', file], { from: 'user' });
 
-    const output = logSpy.mock.calls[0][0] as string;
+    const output = spies.logSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
     expect(parsed).toEqual([{ id: 'abc123' }, { id: 'def456' }]);
   });
@@ -91,13 +87,7 @@ describe('batch command', () => {
     exitSpy = mockExitThrow();
 
     const { batchCommand } = await import('../../../src/commands/emails/batch');
-    try {
-      await batchCommand.parseAsync([], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => batchCommand.parseAsync([], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('missing_file');
@@ -109,13 +99,7 @@ describe('batch command', () => {
     exitSpy = mockExitThrow();
 
     const { batchCommand } = await import('../../../src/commands/emails/batch');
-    try {
-      await batchCommand.parseAsync(['--file', '/tmp/nonexistent-resend-batch.json'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => batchCommand.parseAsync(['--file', '/tmp/nonexistent-resend-batch.json'], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('file_read_error');
@@ -131,13 +115,7 @@ describe('batch command', () => {
     tmpFile = path;
 
     const { batchCommand } = await import('../../../src/commands/emails/batch');
-    try {
-      await batchCommand.parseAsync(['--file', path], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => batchCommand.parseAsync(['--file', path], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('invalid_json');
@@ -150,13 +128,7 @@ describe('batch command', () => {
 
     const file = await writeTmpJson({ from: 'you@domain.com', to: ['user@example.com'] });
     const { batchCommand } = await import('../../../src/commands/emails/batch');
-    try {
-      await batchCommand.parseAsync(['--file', file], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => batchCommand.parseAsync(['--file', file], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('invalid_format');
@@ -175,13 +147,7 @@ describe('batch command', () => {
     ];
     const file = await writeTmpJson(emails);
     const { batchCommand } = await import('../../../src/commands/emails/batch');
-    try {
-      await batchCommand.parseAsync(['--file', file], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => batchCommand.parseAsync(['--file', file], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('attachments');
@@ -197,22 +163,14 @@ describe('batch command', () => {
     ];
     const file = await writeTmpJson(emails);
     const { batchCommand } = await import('../../../src/commands/emails/batch');
-    try {
-      await batchCommand.parseAsync(['--file', file], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => batchCommand.parseAsync(['--file', file], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('scheduled_at');
   });
 
   test('warns but continues when array length exceeds 100', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
     const warnSpy = spyOn(console, 'warn').mockImplementation(() => {});
 
     const emails = Array.from({ length: 101 }, (_, i) => ({
@@ -231,9 +189,7 @@ describe('batch command', () => {
   });
 
   test('passes idempotency key to batch.send', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const file = await writeTmpJson(VALID_EMAILS);
     const { batchCommand } = await import('../../../src/commands/emails/batch');
@@ -253,13 +209,7 @@ describe('batch command', () => {
 
     const file = await writeTmpJson(VALID_EMAILS);
     const { batchCommand } = await import('../../../src/commands/emails/batch');
-    try {
-      await batchCommand.parseAsync(['--file', file], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => batchCommand.parseAsync(['--file', file], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('auth_error');
@@ -269,7 +219,7 @@ describe('batch command', () => {
     // Make it look like a TTY so outputResult uses human-readable format
     Object.defineProperty(process.stdin, 'isTTY', { value: true, writable: true });
     Object.defineProperty(process.stdout, 'isTTY', { value: true, writable: true });
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
+    const logSpy = spyOn(console, 'log').mockImplementation(() => {});
     stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
 
     const file = await writeTmpJson(VALID_EMAILS);
@@ -280,6 +230,8 @@ describe('batch command', () => {
     expect(allOutput).toContain('2');
     expect(allOutput).toContain('abc123');
     expect(allOutput).toContain('def456');
+
+    logSpy.mockRestore();
   });
 
   test('errors with batch_error when SDK returns an error', async () => {
@@ -295,13 +247,7 @@ describe('batch command', () => {
 
     const file = await writeTmpJson(VALID_EMAILS);
     const { batchCommand } = await import('../../../src/commands/emails/batch');
-    try {
-      await batchCommand.parseAsync(['--file', file], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => batchCommand.parseAsync(['--file', file], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('batch_error');

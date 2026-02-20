@@ -2,13 +2,14 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { captureTestEnv } from '../helpers';
 import { getConfigDir, resolveApiKey, storeApiKey } from '../../src/lib/config';
 
 describe('getConfigDir', () => {
-  const originalEnv = { ...process.env };
+  const restoreEnv = captureTestEnv();
 
   afterEach(() => {
-    process.env = { ...originalEnv };
+    restoreEnv();
   });
 
   test('respects XDG_CONFIG_HOME', () => {
@@ -24,7 +25,7 @@ describe('getConfigDir', () => {
 });
 
 describe('resolveApiKey', () => {
-  const originalEnv = { ...process.env };
+  const restoreEnv = captureTestEnv();
   let tmpDir: string;
 
   beforeEach(() => {
@@ -33,7 +34,7 @@ describe('resolveApiKey', () => {
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
+    restoreEnv();
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
@@ -92,8 +93,8 @@ describe('resolveApiKey', () => {
 });
 
 describe('storeApiKey', () => {
+  const restoreEnv = captureTestEnv();
   let tmpDir: string;
-  const originalEnv = { ...process.env };
 
   beforeEach(() => {
     tmpDir = join(tmpdir(), `resend-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -101,7 +102,7 @@ describe('storeApiKey', () => {
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
+    restoreEnv();
     rmSync(tmpDir, { recursive: true, force: true });
   });
 

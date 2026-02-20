@@ -1,17 +1,14 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, afterEach } from 'bun:test';
+import { captureTestEnv } from '../helpers';
 
 // We need to import the module fresh per test to pick up env changes,
 // so we use dynamic imports.
 
 describe('isInteractive', () => {
-  const originalEnv = { ...process.env };
-  const originalStdinIsTTY = process.stdin.isTTY;
-  const originalStdoutIsTTY = process.stdout.isTTY;
+  const restoreEnv = captureTestEnv();
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, writable: true });
+    restoreEnv();
   });
 
   function setTTY(stdin: boolean, stdout: boolean) {

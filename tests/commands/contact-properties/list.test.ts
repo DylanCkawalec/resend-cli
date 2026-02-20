@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn, afterEach, mock, beforeEach } from 'bun:test';
-import { ExitError, setNonInteractive, mockExitThrow } from '../../helpers';
+import { setNonInteractive, mockExitThrow, captureTestEnv, setupOutputSpies, expectExit1 } from '../../helpers';
 
 const mockList = mock(async () => ({
   data: {
@@ -26,13 +26,11 @@ mock.module('resend', () => ({
 }));
 
 describe('contact-properties list command', () => {
-  const originalEnv = { ...process.env };
-  const originalStdinIsTTY = process.stdin.isTTY;
-  const originalStdoutIsTTY = process.stdout.isTTY;
-  let logSpy: ReturnType<typeof spyOn>;
-  let errorSpy: ReturnType<typeof spyOn>;
-  let exitSpy: ReturnType<typeof spyOn>;
-  let stderrSpy: ReturnType<typeof spyOn>;
+  const restoreEnv = captureTestEnv();
+  let spies: ReturnType<typeof setupOutputSpies> | undefined;
+  let errorSpy: ReturnType<typeof spyOn> | undefined;
+  let stderrSpy: ReturnType<typeof spyOn> | undefined;
+  let exitSpy: ReturnType<typeof spyOn> | undefined;
 
   beforeEach(() => {
     process.env.RESEND_API_KEY = 're_test_key';
@@ -40,19 +38,19 @@ describe('contact-properties list command', () => {
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, writable: true });
-    logSpy?.mockRestore();
+    restoreEnv();
+    spies?.restore();
     errorSpy?.mockRestore();
-    exitSpy?.mockRestore();
     stderrSpy?.mockRestore();
+    exitSpy?.mockRestore();
+    spies = undefined;
+    errorSpy = undefined;
+    stderrSpy = undefined;
+    exitSpy = undefined;
   });
 
   test('calls SDK with default limit of 10', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { listContactPropertiesCommand } = await import('../../../src/commands/contact-properties/list');
     await listContactPropertiesCommand.parseAsync([], { from: 'user' });
@@ -63,9 +61,7 @@ describe('contact-properties list command', () => {
   });
 
   test('calls SDK with custom --limit', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { listContactPropertiesCommand } = await import('../../../src/commands/contact-properties/list');
     await listContactPropertiesCommand.parseAsync(['--limit', '25'], { from: 'user' });
@@ -75,9 +71,7 @@ describe('contact-properties list command', () => {
   });
 
   test('calls SDK with --after cursor', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { listContactPropertiesCommand } = await import('../../../src/commands/contact-properties/list');
     await listContactPropertiesCommand.parseAsync(['--after', 'prop_cursor_xyz'], { from: 'user' });
@@ -87,14 +81,12 @@ describe('contact-properties list command', () => {
   });
 
   test('outputs JSON list when non-interactive', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { listContactPropertiesCommand } = await import('../../../src/commands/contact-properties/list');
     await listContactPropertiesCommand.parseAsync([], { from: 'user' });
 
-    const output = logSpy.mock.calls[0][0] as string;
+    const output = spies.logSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
     expect(parsed.object).toBe('list');
     expect(Array.isArray(parsed.data)).toBe(true);
@@ -108,13 +100,7 @@ describe('contact-properties list command', () => {
     exitSpy = mockExitThrow();
 
     const { listContactPropertiesCommand } = await import('../../../src/commands/contact-properties/list');
-    try {
-      await listContactPropertiesCommand.parseAsync(['--limit', '0'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => listContactPropertiesCommand.parseAsync(['--limit', '0'], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('invalid_limit');
@@ -128,13 +114,7 @@ describe('contact-properties list command', () => {
     exitSpy = mockExitThrow();
 
     const { listContactPropertiesCommand } = await import('../../../src/commands/contact-properties/list');
-    try {
-      await listContactPropertiesCommand.parseAsync([], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => listContactPropertiesCommand.parseAsync([], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('auth_error');
@@ -148,13 +128,7 @@ describe('contact-properties list command', () => {
     exitSpy = mockExitThrow();
 
     const { listContactPropertiesCommand } = await import('../../../src/commands/contact-properties/list');
-    try {
-      await listContactPropertiesCommand.parseAsync([], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => listContactPropertiesCommand.parseAsync([], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('list_error');

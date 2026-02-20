@@ -1,7 +1,7 @@
 import { describe, test, expect, spyOn, afterEach, mock, beforeEach } from 'bun:test';
 import { join } from 'node:path';
 import { unlinkSync } from 'node:fs';
-import { ExitError, setNonInteractive, mockExitThrow } from '../../helpers';
+import { setNonInteractive, mockExitThrow, captureTestEnv, setupOutputSpies, expectExit1 } from '../../helpers';
 
 const mockSend = mock(async () => ({
   data: { id: 'test-email-id-123' },
@@ -22,13 +22,11 @@ mock.module('resend', () => ({
 }));
 
 describe('send command', () => {
-  const originalEnv = { ...process.env };
-  const originalStdinIsTTY = process.stdin.isTTY;
-  const originalStdoutIsTTY = process.stdout.isTTY;
-  let logSpy: ReturnType<typeof spyOn>;
-  let errorSpy: ReturnType<typeof spyOn>;
-  let exitSpy: ReturnType<typeof spyOn>;
-  let stderrSpy: ReturnType<typeof spyOn>;
+  const restoreEnv = captureTestEnv();
+  let spies: ReturnType<typeof setupOutputSpies> | undefined;
+  let errorSpy: ReturnType<typeof spyOn> | undefined;
+  let stderrSpy: ReturnType<typeof spyOn> | undefined;
+  let exitSpy: ReturnType<typeof spyOn> | undefined;
 
   beforeEach(() => {
     process.env.RESEND_API_KEY = 're_test_key';
@@ -37,19 +35,19 @@ describe('send command', () => {
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, writable: true });
-    logSpy?.mockRestore();
+    restoreEnv();
+    spies?.restore();
     errorSpy?.mockRestore();
-    exitSpy?.mockRestore();
     stderrSpy?.mockRestore();
+    exitSpy?.mockRestore();
+    spies = undefined;
+    errorSpy = undefined;
+    stderrSpy = undefined;
+    exitSpy = undefined;
   });
 
   test('sends email with all flags provided', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { sendCommand } = await import('../../../src/commands/emails/send');
     await sendCommand.parseAsync(
@@ -66,9 +64,7 @@ describe('send command', () => {
   });
 
   test('outputs JSON with email ID on success', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { sendCommand } = await import('../../../src/commands/emails/send');
     await sendCommand.parseAsync(
@@ -76,15 +72,13 @@ describe('send command', () => {
       { from: 'user' }
     );
 
-    const output = logSpy.mock.calls[0][0] as string;
+    const output = spies.logSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
     expect(parsed.id).toBe('test-email-id-123');
   });
 
   test('sends HTML email when --html provided', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { sendCommand } = await import('../../../src/commands/emails/send');
     await sendCommand.parseAsync(
@@ -98,9 +92,7 @@ describe('send command', () => {
   });
 
   test('supports multiple --to addresses', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { sendCommand } = await import('../../../src/commands/emails/send');
     await sendCommand.parseAsync(
@@ -120,16 +112,12 @@ describe('send command', () => {
     exitSpy = mockExitThrow();
 
     const { sendCommand } = await import('../../../src/commands/emails/send');
-    try {
-      await sendCommand.parseAsync(
+    await expectExit1(() =>
+      sendCommand.parseAsync(
         ['--from', 'a@test.com', '--to', 'b@test.com', '--subject', 'Test', '--text', 'Hi'],
         { from: 'user' }
-      );
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+      )
+    );
   });
 
   test('errors listing missing flags in non-interactive mode', async () => {
@@ -138,12 +126,7 @@ describe('send command', () => {
     exitSpy = mockExitThrow();
 
     const { sendCommand } = await import('../../../src/commands/emails/send');
-    try {
-      await sendCommand.parseAsync(['--from', 'a@test.com'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-    }
+    await expectExit1(() => sendCommand.parseAsync(['--from', 'a@test.com'], { from: 'user' }));
 
     const allErrors = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(allErrors).toContain('--to');
@@ -156,22 +139,16 @@ describe('send command', () => {
     exitSpy = mockExitThrow();
 
     const { sendCommand } = await import('../../../src/commands/emails/send');
-    try {
-      await sendCommand.parseAsync(
+    await expectExit1(() =>
+      sendCommand.parseAsync(
         ['--from', 'a@test.com', '--to', 'b@test.com', '--subject', 'Test'],
         { from: 'user' }
-      );
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+      )
+    );
   });
 
   test('reads HTML body from --html-file', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const tmpFile = join(import.meta.dir, '__test_email.html');
     await Bun.write(tmpFile, '<h1>From file</h1>');
@@ -191,9 +168,7 @@ describe('send command', () => {
   });
 
   test('passes cc, bcc, reply-to when provided', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { sendCommand } = await import('../../../src/commands/emails/send');
     await sendCommand.parseAsync(
@@ -211,9 +186,7 @@ describe('send command', () => {
   });
 
   test('does not call domains.list when --from is provided', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { sendCommand } = await import('../../../src/commands/emails/send');
     await sendCommand.parseAsync(

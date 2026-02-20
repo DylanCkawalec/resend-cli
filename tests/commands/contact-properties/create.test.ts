@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn, afterEach, mock, beforeEach } from 'bun:test';
-import { ExitError, setNonInteractive, mockExitThrow } from '../../helpers';
+import { setNonInteractive, mockExitThrow, captureTestEnv, setupOutputSpies, expectExit1 } from '../../helpers';
 
 const mockCreate = mock(async () => ({
   data: { object: 'contact_property' as const, id: 'prop_abc123' },
@@ -14,13 +14,11 @@ mock.module('resend', () => ({
 }));
 
 describe('contact-properties create command', () => {
-  const originalEnv = { ...process.env };
-  const originalStdinIsTTY = process.stdin.isTTY;
-  const originalStdoutIsTTY = process.stdout.isTTY;
-  let logSpy: ReturnType<typeof spyOn>;
-  let errorSpy: ReturnType<typeof spyOn>;
-  let exitSpy: ReturnType<typeof spyOn>;
-  let stderrSpy: ReturnType<typeof spyOn>;
+  const restoreEnv = captureTestEnv();
+  let spies: ReturnType<typeof setupOutputSpies> | undefined;
+  let errorSpy: ReturnType<typeof spyOn> | undefined;
+  let stderrSpy: ReturnType<typeof spyOn> | undefined;
+  let exitSpy: ReturnType<typeof spyOn> | undefined;
 
   beforeEach(() => {
     process.env.RESEND_API_KEY = 're_test_key';
@@ -28,19 +26,19 @@ describe('contact-properties create command', () => {
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, writable: true });
-    logSpy?.mockRestore();
+    restoreEnv();
+    spies?.restore();
     errorSpy?.mockRestore();
-    exitSpy?.mockRestore();
     stderrSpy?.mockRestore();
+    exitSpy?.mockRestore();
+    spies = undefined;
+    errorSpy = undefined;
+    stderrSpy = undefined;
+    exitSpy = undefined;
   });
 
   test('creates property with --key and --type', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { createContactPropertyCommand } = await import('../../../src/commands/contact-properties/create');
     await createContactPropertyCommand.parseAsync(['--key', 'company_name', '--type', 'string'], { from: 'user' });
@@ -52,9 +50,7 @@ describe('contact-properties create command', () => {
   });
 
   test('creates number-type property', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { createContactPropertyCommand } = await import('../../../src/commands/contact-properties/create');
     await createContactPropertyCommand.parseAsync(['--key', 'score', '--type', 'number'], { from: 'user' });
@@ -65,9 +61,7 @@ describe('contact-properties create command', () => {
   });
 
   test('passes string fallback-value to SDK', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { createContactPropertyCommand } = await import('../../../src/commands/contact-properties/create');
     await createContactPropertyCommand.parseAsync(
@@ -80,9 +74,7 @@ describe('contact-properties create command', () => {
   });
 
   test('coerces fallback-value to number for number-type properties', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { createContactPropertyCommand } = await import('../../../src/commands/contact-properties/create');
     await createContactPropertyCommand.parseAsync(
@@ -95,14 +87,12 @@ describe('contact-properties create command', () => {
   });
 
   test('outputs JSON id when non-interactive', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { createContactPropertyCommand } = await import('../../../src/commands/contact-properties/create');
     await createContactPropertyCommand.parseAsync(['--key', 'plan', '--type', 'string'], { from: 'user' });
 
-    const output = logSpy.mock.calls[0][0] as string;
+    const output = spies.logSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
     expect(parsed.object).toBe('contact_property');
     expect(parsed.id).toBe('prop_abc123');
@@ -114,13 +104,7 @@ describe('contact-properties create command', () => {
     exitSpy = mockExitThrow();
 
     const { createContactPropertyCommand } = await import('../../../src/commands/contact-properties/create');
-    try {
-      await createContactPropertyCommand.parseAsync(['--type', 'string'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => createContactPropertyCommand.parseAsync(['--type', 'string'], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('missing_key');
@@ -132,13 +116,7 @@ describe('contact-properties create command', () => {
     exitSpy = mockExitThrow();
 
     const { createContactPropertyCommand } = await import('../../../src/commands/contact-properties/create');
-    try {
-      await createContactPropertyCommand.parseAsync(['--key', 'company_name'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => createContactPropertyCommand.parseAsync(['--key', 'company_name'], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('missing_type');
@@ -150,16 +128,12 @@ describe('contact-properties create command', () => {
     exitSpy = mockExitThrow();
 
     const { createContactPropertyCommand } = await import('../../../src/commands/contact-properties/create');
-    try {
-      await createContactPropertyCommand.parseAsync(
+    await expectExit1(() =>
+      createContactPropertyCommand.parseAsync(
         ['--key', 'score', '--type', 'number', '--fallback-value', 'not-a-number'],
         { from: 'user' }
-      );
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+      )
+    );
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('invalid_fallback_value');
@@ -173,13 +147,9 @@ describe('contact-properties create command', () => {
     exitSpy = mockExitThrow();
 
     const { createContactPropertyCommand } = await import('../../../src/commands/contact-properties/create');
-    try {
-      await createContactPropertyCommand.parseAsync(['--key', 'company_name', '--type', 'string'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() =>
+      createContactPropertyCommand.parseAsync(['--key', 'company_name', '--type', 'string'], { from: 'user' })
+    );
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('auth_error');
@@ -193,13 +163,9 @@ describe('contact-properties create command', () => {
     exitSpy = mockExitThrow();
 
     const { createContactPropertyCommand } = await import('../../../src/commands/contact-properties/create');
-    try {
-      await createContactPropertyCommand.parseAsync(['--key', 'company_name', '--type', 'string'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() =>
+      createContactPropertyCommand.parseAsync(['--key', 'company_name', '--type', 'string'], { from: 'user' })
+    );
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('create_error');

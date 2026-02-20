@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn, afterEach, mock, beforeEach } from 'bun:test';
-import { ExitError, setNonInteractive, mockExitThrow } from '../../helpers';
+import { setNonInteractive, mockExitThrow, captureTestEnv, setupOutputSpies, expectExit1 } from '../../helpers';
 
 const mockCreate = mock(async () => ({
   data: { id: 'test-key-id', token: 're_testtoken1234567890' },
@@ -14,13 +14,11 @@ mock.module('resend', () => ({
 }));
 
 describe('api-keys create command', () => {
-  const originalEnv = { ...process.env };
-  const originalStdinIsTTY = process.stdin.isTTY;
-  const originalStdoutIsTTY = process.stdout.isTTY;
-  let logSpy: ReturnType<typeof spyOn>;
-  let errorSpy: ReturnType<typeof spyOn>;
-  let exitSpy: ReturnType<typeof spyOn>;
-  let stderrSpy: ReturnType<typeof spyOn>;
+  const restoreEnv = captureTestEnv();
+  let spies: ReturnType<typeof setupOutputSpies> | undefined;
+  let errorSpy: ReturnType<typeof spyOn> | undefined;
+  let stderrSpy: ReturnType<typeof spyOn> | undefined;
+  let exitSpy: ReturnType<typeof spyOn> | undefined;
 
   beforeEach(() => {
     process.env.RESEND_API_KEY = 're_test_key';
@@ -28,19 +26,19 @@ describe('api-keys create command', () => {
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, writable: true });
-    logSpy?.mockRestore();
+    restoreEnv();
+    spies?.restore();
     errorSpy?.mockRestore();
-    exitSpy?.mockRestore();
     stderrSpy?.mockRestore();
+    exitSpy?.mockRestore();
+    spies = undefined;
+    errorSpy = undefined;
+    stderrSpy = undefined;
+    exitSpy = undefined;
   });
 
   test('creates API key with --name flag', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { createApiKeyCommand } = await import('../../../src/commands/api-keys/create');
     await createApiKeyCommand.parseAsync(['--name', 'Production'], { from: 'user' });
@@ -51,9 +49,7 @@ describe('api-keys create command', () => {
   });
 
   test('passes permission flag to SDK', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { createApiKeyCommand } = await import('../../../src/commands/api-keys/create');
     await createApiKeyCommand.parseAsync(
@@ -66,9 +62,7 @@ describe('api-keys create command', () => {
   });
 
   test('passes domain_id (snake_case) to SDK when --domain-id is provided', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { createApiKeyCommand } = await import('../../../src/commands/api-keys/create');
     await createApiKeyCommand.parseAsync(
@@ -81,14 +75,12 @@ describe('api-keys create command', () => {
   });
 
   test('outputs JSON result when non-interactive', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { createApiKeyCommand } = await import('../../../src/commands/api-keys/create');
     await createApiKeyCommand.parseAsync(['--name', 'Production'], { from: 'user' });
 
-    const output = logSpy.mock.calls[0][0] as string;
+    const output = spies.logSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
     expect(parsed.id).toBe('test-key-id');
     expect(parsed.token).toBe('re_testtoken1234567890');
@@ -100,13 +92,7 @@ describe('api-keys create command', () => {
     exitSpy = mockExitThrow();
 
     const { createApiKeyCommand } = await import('../../../src/commands/api-keys/create');
-    try {
-      await createApiKeyCommand.parseAsync([], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => createApiKeyCommand.parseAsync([], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('missing_name');
@@ -135,13 +121,7 @@ describe('api-keys create command', () => {
     exitSpy = mockExitThrow();
 
     const { createApiKeyCommand } = await import('../../../src/commands/api-keys/create');
-    try {
-      await createApiKeyCommand.parseAsync(['--name', 'Production'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => createApiKeyCommand.parseAsync(['--name', 'Production'], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('auth_error');
@@ -155,13 +135,7 @@ describe('api-keys create command', () => {
     exitSpy = mockExitThrow();
 
     const { createApiKeyCommand } = await import('../../../src/commands/api-keys/create');
-    try {
-      await createApiKeyCommand.parseAsync(['--name', 'Production'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => createApiKeyCommand.parseAsync(['--name', 'Production'], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('create_error');

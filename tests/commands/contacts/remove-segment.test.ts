@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn, afterEach, mock, beforeEach } from 'bun:test';
-import { ExitError, setNonInteractive, mockExitThrow } from '../../helpers';
+import { setNonInteractive, mockExitThrow, captureTestEnv, setupOutputSpies, expectExit1 } from '../../helpers';
 
 const mockRemoveSegment = mock(async () => ({
   data: { id: 'seg_123', deleted: true },
@@ -16,13 +16,11 @@ mock.module('resend', () => ({
 }));
 
 describe('contacts remove-segment command', () => {
-  const originalEnv = { ...process.env };
-  const originalStdinIsTTY = process.stdin.isTTY;
-  const originalStdoutIsTTY = process.stdout.isTTY;
-  let logSpy: ReturnType<typeof spyOn>;
-  let errorSpy: ReturnType<typeof spyOn>;
-  let exitSpy: ReturnType<typeof spyOn>;
-  let stderrSpy: ReturnType<typeof spyOn>;
+  const restoreEnv = captureTestEnv();
+  let spies: ReturnType<typeof setupOutputSpies> | undefined;
+  let errorSpy: ReturnType<typeof spyOn> | undefined;
+  let stderrSpy: ReturnType<typeof spyOn> | undefined;
+  let exitSpy: ReturnType<typeof spyOn> | undefined;
 
   beforeEach(() => {
     process.env.RESEND_API_KEY = 're_test_key';
@@ -30,19 +28,19 @@ describe('contacts remove-segment command', () => {
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, writable: true });
-    logSpy?.mockRestore();
+    restoreEnv();
+    spies?.restore();
     errorSpy?.mockRestore();
-    exitSpy?.mockRestore();
     stderrSpy?.mockRestore();
+    exitSpy?.mockRestore();
+    spies = undefined;
+    errorSpy = undefined;
+    stderrSpy = undefined;
+    exitSpy = undefined;
   });
 
   test('removes contact from segment by contact ID', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { removeContactSegmentCommand } = await import('../../../src/commands/contacts/remove-segment');
     await removeContactSegmentCommand.parseAsync(['contact_abc123', 'seg_123'], { from: 'user' });
@@ -54,9 +52,7 @@ describe('contacts remove-segment command', () => {
   });
 
   test('removes contact from segment by email', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { removeContactSegmentCommand } = await import('../../../src/commands/contacts/remove-segment');
     await removeContactSegmentCommand.parseAsync(['jane@example.com', 'seg_123'], { from: 'user' });
@@ -67,14 +63,12 @@ describe('contacts remove-segment command', () => {
   });
 
   test('outputs JSON result when non-interactive', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { removeContactSegmentCommand } = await import('../../../src/commands/contacts/remove-segment');
     await removeContactSegmentCommand.parseAsync(['contact_abc123', 'seg_123'], { from: 'user' });
 
-    const output = logSpy.mock.calls[0][0] as string;
+    const output = spies.logSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
     expect(parsed.id).toBe('seg_123');
     expect(parsed.deleted).toBe(true);
@@ -88,13 +82,7 @@ describe('contacts remove-segment command', () => {
     exitSpy = mockExitThrow();
 
     const { removeContactSegmentCommand } = await import('../../../src/commands/contacts/remove-segment');
-    try {
-      await removeContactSegmentCommand.parseAsync(['contact_abc123', 'seg_123'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => removeContactSegmentCommand.parseAsync(['contact_abc123', 'seg_123'], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('auth_error');
@@ -108,13 +96,7 @@ describe('contacts remove-segment command', () => {
     exitSpy = mockExitThrow();
 
     const { removeContactSegmentCommand } = await import('../../../src/commands/contacts/remove-segment');
-    try {
-      await removeContactSegmentCommand.parseAsync(['contact_abc123', 'bad_seg'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => removeContactSegmentCommand.parseAsync(['contact_abc123', 'bad_seg'], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('remove_segment_error');

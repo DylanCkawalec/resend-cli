@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn, afterEach, mock, beforeEach } from 'bun:test';
-import { ExitError, setNonInteractive, mockExitThrow } from '../../helpers';
+import { setNonInteractive, mockExitThrow, captureTestEnv, setupOutputSpies, expectExit1 } from '../../helpers';
 
 const mockUpdateTopics = mock(async () => ({
   data: { id: 'contact_abc123' },
@@ -16,13 +16,11 @@ mock.module('resend', () => ({
 }));
 
 describe('contacts update-topics command', () => {
-  const originalEnv = { ...process.env };
-  const originalStdinIsTTY = process.stdin.isTTY;
-  const originalStdoutIsTTY = process.stdout.isTTY;
-  let logSpy: ReturnType<typeof spyOn>;
-  let errorSpy: ReturnType<typeof spyOn>;
-  let exitSpy: ReturnType<typeof spyOn>;
-  let stderrSpy: ReturnType<typeof spyOn>;
+  const restoreEnv = captureTestEnv();
+  let spies: ReturnType<typeof setupOutputSpies> | undefined;
+  let errorSpy: ReturnType<typeof spyOn> | undefined;
+  let stderrSpy: ReturnType<typeof spyOn> | undefined;
+  let exitSpy: ReturnType<typeof spyOn> | undefined;
 
   beforeEach(() => {
     process.env.RESEND_API_KEY = 're_test_key';
@@ -30,19 +28,19 @@ describe('contacts update-topics command', () => {
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, writable: true });
-    logSpy?.mockRestore();
+    restoreEnv();
+    spies?.restore();
     errorSpy?.mockRestore();
-    exitSpy?.mockRestore();
     stderrSpy?.mockRestore();
+    exitSpy?.mockRestore();
+    spies = undefined;
+    errorSpy = undefined;
+    stderrSpy = undefined;
+    exitSpy = undefined;
   });
 
   test('updates topics by contact ID', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { updateContactTopicsCommand } = await import('../../../src/commands/contacts/update-topics');
     await updateContactTopicsCommand.parseAsync(
@@ -57,9 +55,7 @@ describe('contacts update-topics command', () => {
   });
 
   test('updates topics by contact email', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { updateContactTopicsCommand } = await import('../../../src/commands/contacts/update-topics');
     await updateContactTopicsCommand.parseAsync(
@@ -73,9 +69,7 @@ describe('contacts update-topics command', () => {
   });
 
   test('passes multiple topics in array', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { updateContactTopicsCommand } = await import('../../../src/commands/contacts/update-topics');
     await updateContactTopicsCommand.parseAsync(
@@ -88,9 +82,7 @@ describe('contacts update-topics command', () => {
   });
 
   test('outputs JSON result when non-interactive', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { updateContactTopicsCommand } = await import('../../../src/commands/contacts/update-topics');
     await updateContactTopicsCommand.parseAsync(
@@ -98,7 +90,7 @@ describe('contacts update-topics command', () => {
       { from: 'user' }
     );
 
-    const output = logSpy.mock.calls[0][0] as string;
+    const output = spies.logSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
     expect(parsed.id).toBe('contact_abc123');
   });
@@ -109,13 +101,7 @@ describe('contacts update-topics command', () => {
     exitSpy = mockExitThrow();
 
     const { updateContactTopicsCommand } = await import('../../../src/commands/contacts/update-topics');
-    try {
-      await updateContactTopicsCommand.parseAsync(['contact_abc123'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => updateContactTopicsCommand.parseAsync(['contact_abc123'], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('missing_topics');
@@ -127,13 +113,7 @@ describe('contacts update-topics command', () => {
     exitSpy = mockExitThrow();
 
     const { updateContactTopicsCommand } = await import('../../../src/commands/contacts/update-topics');
-    try {
-      await updateContactTopicsCommand.parseAsync(['contact_abc123', '--topics', 'not-json'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => updateContactTopicsCommand.parseAsync(['contact_abc123', '--topics', 'not-json'], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('invalid_topics');
@@ -145,13 +125,7 @@ describe('contacts update-topics command', () => {
     exitSpy = mockExitThrow();
 
     const { updateContactTopicsCommand } = await import('../../../src/commands/contacts/update-topics');
-    try {
-      await updateContactTopicsCommand.parseAsync(['contact_abc123', '--topics', '{"id":"t1"}'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => updateContactTopicsCommand.parseAsync(['contact_abc123', '--topics', '{"id":"t1"}'], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('invalid_topics');
@@ -165,16 +139,10 @@ describe('contacts update-topics command', () => {
     exitSpy = mockExitThrow();
 
     const { updateContactTopicsCommand } = await import('../../../src/commands/contacts/update-topics');
-    try {
-      await updateContactTopicsCommand.parseAsync(
-        ['contact_abc123', '--topics', '[{"id":"t1","subscription":"opt_in"}]'],
-        { from: 'user' }
-      );
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => updateContactTopicsCommand.parseAsync(
+      ['contact_abc123', '--topics', '[{"id":"t1","subscription":"opt_in"}]'],
+      { from: 'user' }
+    ));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('auth_error');
@@ -188,16 +156,10 @@ describe('contacts update-topics command', () => {
     exitSpy = mockExitThrow();
 
     const { updateContactTopicsCommand } = await import('../../../src/commands/contacts/update-topics');
-    try {
-      await updateContactTopicsCommand.parseAsync(
-        ['contact_abc123', '--topics', '[{"id":"bad_topic","subscription":"opt_in"}]'],
-        { from: 'user' }
-      );
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => updateContactTopicsCommand.parseAsync(
+      ['contact_abc123', '--topics', '[{"id":"bad_topic","subscription":"opt_in"}]'],
+      { from: 'user' }
+    ));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('update_topics_error');

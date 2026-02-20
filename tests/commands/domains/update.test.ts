@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn, afterEach, mock, beforeEach } from 'bun:test';
-import { ExitError, setNonInteractive, mockExitThrow } from '../../helpers';
+import { setNonInteractive, mockExitThrow, captureTestEnv, setupOutputSpies, expectExit1 } from '../../helpers';
 
 const mockUpdate = mock(async () => ({
   data: { object: 'domain', id: 'test-domain-id' },
@@ -14,13 +14,11 @@ mock.module('resend', () => ({
 }));
 
 describe('domains update command', () => {
-  const originalEnv = { ...process.env };
-  const originalStdinIsTTY = process.stdin.isTTY;
-  const originalStdoutIsTTY = process.stdout.isTTY;
-  let logSpy: ReturnType<typeof spyOn>;
-  let errorSpy: ReturnType<typeof spyOn>;
-  let exitSpy: ReturnType<typeof spyOn>;
-  let stderrSpy: ReturnType<typeof spyOn>;
+  const restoreEnv = captureTestEnv();
+  let spies: ReturnType<typeof setupOutputSpies> | undefined;
+  let errorSpy: ReturnType<typeof spyOn> | undefined;
+  let stderrSpy: ReturnType<typeof spyOn> | undefined;
+  let exitSpy: ReturnType<typeof spyOn> | undefined;
 
   beforeEach(() => {
     process.env.RESEND_API_KEY = 're_test_key';
@@ -28,19 +26,19 @@ describe('domains update command', () => {
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, writable: true });
-    logSpy?.mockRestore();
+    restoreEnv();
+    spies?.restore();
     errorSpy?.mockRestore();
-    exitSpy?.mockRestore();
     stderrSpy?.mockRestore();
+    exitSpy?.mockRestore();
+    spies = undefined;
+    errorSpy = undefined;
+    stderrSpy = undefined;
+    exitSpy = undefined;
   });
 
   test('calls SDK update with correct id', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { updateDomainCommand } = await import('../../../src/commands/domains/update');
     await updateDomainCommand.parseAsync(['test-domain-id', '--tls', 'enforced'], { from: 'user' });
@@ -52,9 +50,7 @@ describe('domains update command', () => {
   });
 
   test('passes openTracking=true when --open-tracking is set', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { updateDomainCommand } = await import('../../../src/commands/domains/update');
     await updateDomainCommand.parseAsync(['test-domain-id', '--open-tracking'], { from: 'user' });
@@ -64,9 +60,7 @@ describe('domains update command', () => {
   });
 
   test('passes openTracking=false when --no-open-tracking is set', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { updateDomainCommand } = await import('../../../src/commands/domains/update');
     await updateDomainCommand.parseAsync(['test-domain-id', '--no-open-tracking'], { from: 'user' });
@@ -76,9 +70,7 @@ describe('domains update command', () => {
   });
 
   test('does not include tracking keys in payload when no tracking flags are passed', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { updateDomainCommand } = await import('../../../src/commands/domains/update');
     await updateDomainCommand.parseAsync(['test-domain-id', '--tls', 'enforced'], { from: 'user' });
@@ -89,9 +81,7 @@ describe('domains update command', () => {
   });
 
   test('passes clickTracking=true when --click-tracking is set', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { updateDomainCommand } = await import('../../../src/commands/domains/update');
     await updateDomainCommand.parseAsync(['test-domain-id', '--click-tracking'], { from: 'user' });
@@ -101,9 +91,7 @@ describe('domains update command', () => {
   });
 
   test('passes clickTracking=false when --no-click-tracking is set', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { updateDomainCommand } = await import('../../../src/commands/domains/update');
     await updateDomainCommand.parseAsync(['test-domain-id', '--no-click-tracking'], { from: 'user' });
@@ -118,13 +106,7 @@ describe('domains update command', () => {
     exitSpy = mockExitThrow();
 
     const { updateDomainCommand } = await import('../../../src/commands/domains/update');
-    try {
-      await updateDomainCommand.parseAsync(['test-domain-id'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => updateDomainCommand.parseAsync(['test-domain-id'], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('no_changes');
@@ -132,14 +114,12 @@ describe('domains update command', () => {
   });
 
   test('outputs domain JSON on success', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { updateDomainCommand } = await import('../../../src/commands/domains/update');
     await updateDomainCommand.parseAsync(['test-domain-id', '--tls', 'opportunistic'], { from: 'user' });
 
-    const output = logSpy.mock.calls[0][0] as string;
+    const output = spies.logSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
     expect(parsed.object).toBe('domain');
     expect(parsed.id).toBe('test-domain-id');
@@ -153,13 +133,7 @@ describe('domains update command', () => {
     exitSpy = mockExitThrow();
 
     const { updateDomainCommand } = await import('../../../src/commands/domains/update');
-    try {
-      await updateDomainCommand.parseAsync(['test-domain-id', '--tls', 'enforced'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => updateDomainCommand.parseAsync(['test-domain-id', '--tls', 'enforced'], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('auth_error');
@@ -173,13 +147,7 @@ describe('domains update command', () => {
     exitSpy = mockExitThrow();
 
     const { updateDomainCommand } = await import('../../../src/commands/domains/update');
-    try {
-      await updateDomainCommand.parseAsync(['test-domain-id', '--tls', 'enforced'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => updateDomainCommand.parseAsync(['test-domain-id', '--tls', 'enforced'], { from: 'user' }));
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('update_error');

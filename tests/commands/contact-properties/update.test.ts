@@ -1,5 +1,5 @@
 import { describe, test, expect, spyOn, afterEach, mock, beforeEach } from 'bun:test';
-import { ExitError, setNonInteractive, mockExitThrow } from '../../helpers';
+import { setNonInteractive, mockExitThrow, captureTestEnv, setupOutputSpies, expectExit1 } from '../../helpers';
 
 const mockUpdate = mock(async () => ({
   data: { object: 'contact_property' as const, id: 'prop_abc123' },
@@ -14,13 +14,11 @@ mock.module('resend', () => ({
 }));
 
 describe('contact-properties update command', () => {
-  const originalEnv = { ...process.env };
-  const originalStdinIsTTY = process.stdin.isTTY;
-  const originalStdoutIsTTY = process.stdout.isTTY;
-  let logSpy: ReturnType<typeof spyOn>;
-  let errorSpy: ReturnType<typeof spyOn>;
-  let exitSpy: ReturnType<typeof spyOn>;
-  let stderrSpy: ReturnType<typeof spyOn>;
+  const restoreEnv = captureTestEnv();
+  let spies: ReturnType<typeof setupOutputSpies> | undefined;
+  let errorSpy: ReturnType<typeof spyOn> | undefined;
+  let stderrSpy: ReturnType<typeof spyOn> | undefined;
+  let exitSpy: ReturnType<typeof spyOn> | undefined;
 
   beforeEach(() => {
     process.env.RESEND_API_KEY = 're_test_key';
@@ -28,19 +26,19 @@ describe('contact-properties update command', () => {
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, writable: true });
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, writable: true });
-    logSpy?.mockRestore();
+    restoreEnv();
+    spies?.restore();
     errorSpy?.mockRestore();
-    exitSpy?.mockRestore();
     stderrSpy?.mockRestore();
+    exitSpy?.mockRestore();
+    spies = undefined;
+    errorSpy = undefined;
+    stderrSpy = undefined;
+    exitSpy = undefined;
   });
 
   test('updates property fallback value', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { updateContactPropertyCommand } = await import('../../../src/commands/contact-properties/update');
     await updateContactPropertyCommand.parseAsync(['prop_abc123', '--fallback-value', 'Acme Corp'], { from: 'user' });
@@ -52,9 +50,7 @@ describe('contact-properties update command', () => {
   });
 
   test('clears fallback value with --clear-fallback-value', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { updateContactPropertyCommand } = await import('../../../src/commands/contact-properties/update');
     await updateContactPropertyCommand.parseAsync(['prop_abc123', '--clear-fallback-value'], { from: 'user' });
@@ -70,33 +66,50 @@ describe('contact-properties update command', () => {
     exitSpy = mockExitThrow();
 
     const { updateContactPropertyCommand } = await import('../../../src/commands/contact-properties/update');
-    try {
-      await updateContactPropertyCommand.parseAsync(
+    await expectExit1(() =>
+      updateContactPropertyCommand.parseAsync(
         ['prop_abc123', '--fallback-value', 'Acme', '--clear-fallback-value'],
         { from: 'user' }
-      );
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+      )
+    );
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('conflicting_flags');
   });
 
   test('outputs JSON result when non-interactive', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const { updateContactPropertyCommand } = await import('../../../src/commands/contact-properties/update');
     await updateContactPropertyCommand.parseAsync(['prop_abc123', '--fallback-value', 'Test'], { from: 'user' });
 
-    const output = logSpy.mock.calls[0][0] as string;
+    const output = spies.logSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
     expect(parsed.object).toBe('contact_property');
     expect(parsed.id).toBe('prop_abc123');
+  });
+
+  test('errors with no_changes when no flags are provided', async () => {
+    setNonInteractive();
+    errorSpy = spyOn(console, 'error').mockImplementation(() => {});
+    exitSpy = mockExitThrow();
+
+    const { updateContactPropertyCommand } = await import('../../../src/commands/contact-properties/update');
+    await expectExit1(() => updateContactPropertyCommand.parseAsync(['prop_abc123'], { from: 'user' }));
+
+    const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
+    expect(output).toContain('no_changes');
+  });
+
+  test('does not call SDK when no_changes error is raised', async () => {
+    setNonInteractive();
+    errorSpy = spyOn(console, 'error').mockImplementation(() => {});
+    exitSpy = mockExitThrow();
+
+    const { updateContactPropertyCommand } = await import('../../../src/commands/contact-properties/update');
+    await expectExit1(() => updateContactPropertyCommand.parseAsync(['prop_abc123'], { from: 'user' }));
+
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   test('errors with auth_error when no API key', async () => {
@@ -107,13 +120,9 @@ describe('contact-properties update command', () => {
     exitSpy = mockExitThrow();
 
     const { updateContactPropertyCommand } = await import('../../../src/commands/contact-properties/update');
-    try {
-      await updateContactPropertyCommand.parseAsync(['prop_abc123', '--fallback-value', 'Test'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() =>
+      updateContactPropertyCommand.parseAsync(['prop_abc123', '--fallback-value', 'Test'], { from: 'user' })
+    );
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('auth_error');
@@ -127,13 +136,9 @@ describe('contact-properties update command', () => {
     exitSpy = mockExitThrow();
 
     const { updateContactPropertyCommand } = await import('../../../src/commands/contact-properties/update');
-    try {
-      await updateContactPropertyCommand.parseAsync(['nonexistent_id', '--fallback-value', 'Test'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() =>
+      updateContactPropertyCommand.parseAsync(['nonexistent_id', '--fallback-value', 'Test'], { from: 'user' })
+    );
 
     const output = errorSpy.mock.calls.map((c) => c[0]).join(' ');
     expect(output).toContain('update_error');

@@ -1,6 +1,6 @@
 import { describe, test, expect, spyOn, afterEach, mock, beforeEach } from 'bun:test';
 import { Command } from '@commander-js/extra-typings';
-import { ExitError, setNonInteractive, mockExitThrow } from '../helpers';
+import { captureTestEnv, setupOutputSpies, expectExit1, mockExitThrow } from '../helpers';
 
 // Mock resend SDK for doctor
 mock.module('resend', () => ({
@@ -29,36 +29,30 @@ async function createDoctorProgram() {
 }
 
 describe('doctor command', () => {
-  const originalEnv = { ...process.env };
-  const originalStdoutIsTTY = process.stdout.isTTY;
-  const originalStdinIsTTY = process.stdin.isTTY;
-  let logSpy: ReturnType<typeof spyOn>;
-  let stderrSpy: ReturnType<typeof spyOn>;
-  let exitSpy: ReturnType<typeof spyOn>;
+  const restoreEnv = captureTestEnv();
+  let spies: ReturnType<typeof setupOutputSpies> | undefined;
+  let exitSpy: ReturnType<typeof spyOn> | undefined;
 
   beforeEach(() => {
     process.env.RESEND_API_KEY = 're_test_key_for_doctor';
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalStdoutIsTTY, writable: true });
-    Object.defineProperty(process.stdin, 'isTTY', { value: originalStdinIsTTY, writable: true });
-    logSpy?.mockRestore();
-    stderrSpy?.mockRestore();
+    restoreEnv();
+    spies?.restore();
+    spies = undefined;
     exitSpy?.mockRestore();
+    exitSpy = undefined;
   });
 
   test('outputs JSON with --json flag', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const program = await createDoctorProgram();
     await program.parseAsync(['doctor', '--json'], { from: 'user' });
 
-    expect(logSpy).toHaveBeenCalled();
-    const output = logSpy.mock.calls[0][0] as string;
+    expect(spies.logSpy).toHaveBeenCalled();
+    const output = spies.logSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
 
     expect(parsed).toHaveProperty('ok');
@@ -67,14 +61,12 @@ describe('doctor command', () => {
   });
 
   test('JSON output has correct check structure', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const program = await createDoctorProgram();
     await program.parseAsync(['doctor', '--json'], { from: 'user' });
 
-    const output = logSpy.mock.calls[0][0] as string;
+    const output = spies.logSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
 
     for (const check of parsed.checks) {
@@ -86,14 +78,12 @@ describe('doctor command', () => {
   });
 
   test('API key check passes when key is set', async () => {
-    setNonInteractive();
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const program = await createDoctorProgram();
     await program.parseAsync(['doctor', '--json'], { from: 'user' });
 
-    const output = logSpy.mock.calls[0][0] as string;
+    const output = spies.logSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
     const keyCheck = parsed.checks.find((c: any) => c.name === 'API Key');
 
@@ -104,18 +94,16 @@ describe('doctor command', () => {
   });
 
   test('API key check fails when no key is set', async () => {
-    setNonInteractive();
     delete process.env.RESEND_API_KEY;
     process.env.XDG_CONFIG_HOME = '/tmp/nonexistent-resend';
 
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
+    spies = setupOutputSpies();
     exitSpy = spyOn(process, 'exit').mockImplementation(() => undefined as never);
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
 
     const program = await createDoctorProgram();
     await program.parseAsync(['doctor', '--json'], { from: 'user' });
 
-    const output = logSpy.mock.calls[0][0] as string;
+    const output = spies.logSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
 
     expect(parsed.ok).toBe(false);
@@ -124,15 +112,13 @@ describe('doctor command', () => {
   });
 
   test('masks API key in output', async () => {
-    setNonInteractive();
     process.env.RESEND_API_KEY = 're_abcdefghijklmnop';
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    spies = setupOutputSpies();
 
     const program = await createDoctorProgram();
     await program.parseAsync(['doctor', '--json'], { from: 'user' });
 
-    const output = logSpy.mock.calls[0][0] as string;
+    const output = spies.logSpy.mock.calls[0][0] as string;
     const parsed = JSON.parse(output);
     const keyCheck = parsed.checks.find((c: any) => c.name === 'API Key');
 
@@ -144,21 +130,13 @@ describe('doctor command', () => {
   });
 
   test('exits with code 1 when checks fail', async () => {
-    setNonInteractive();
     delete process.env.RESEND_API_KEY;
     process.env.XDG_CONFIG_HOME = '/tmp/nonexistent-resend';
 
-    logSpy = spyOn(console, 'log').mockImplementation(() => {});
+    spies = setupOutputSpies();
     exitSpy = mockExitThrow();
-    stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
 
     const program = await createDoctorProgram();
-    try {
-      await program.parseAsync(['doctor', '--json'], { from: 'user' });
-      expect(true).toBe(false);
-    } catch (err) {
-      expect(err).toBeInstanceOf(ExitError);
-      expect((err as ExitError).code).toBe(1);
-    }
+    await expectExit1(() => program.parseAsync(['doctor', '--json'], { from: 'user' }));
   });
 });
