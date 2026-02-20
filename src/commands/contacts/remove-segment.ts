@@ -4,6 +4,7 @@ import type { GlobalOpts } from '../../lib/client';
 import { requireClient } from '../../lib/client';
 import { createSpinner } from '../../lib/spinner';
 import { outputError, outputResult, errorMessage } from '../../lib/output';
+import { isInteractive } from '../../lib/tty';
 import { segmentContactIdentifier } from './utils';
 
 export const removeContactSegmentCommand = new Command('remove-segment')
@@ -50,7 +51,11 @@ Examples:
       }
 
       spinner.stop('Contact removed from segment');
-      outputResult(data, { json: globalOpts.json });
+      if (!globalOpts.json && isInteractive()) {
+        console.log(`Contact removed from segment: ${segmentId}`);
+      } else {
+        outputResult(data!, { json: globalOpts.json });
+      }
     } catch (err) {
       spinner.fail('Failed to remove contact from segment');
       outputError({ message: errorMessage(err, 'Unknown error'), code: 'remove_segment_error' }, { json: globalOpts.json });

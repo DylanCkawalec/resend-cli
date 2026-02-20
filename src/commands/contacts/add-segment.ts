@@ -69,7 +69,11 @@ Examples:
       }
 
       spinner.stop('Contact added to segment');
-      outputResult(data, { json: globalOpts.json });
+      if (!globalOpts.json && isInteractive()) {
+        console.log(`Contact added to segment: ${segmentId}`);
+      } else {
+        outputResult(data!, { json: globalOpts.json });
+      }
     } catch (err) {
       spinner.fail('Failed to add contact to segment');
       outputError({ message: errorMessage(err, 'Unknown error'), code: 'add_segment_error' }, { json: globalOpts.json });

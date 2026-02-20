@@ -3,6 +3,7 @@ import type { GlobalOpts } from '../../lib/client';
 import { requireClient } from '../../lib/client';
 import { createSpinner } from '../../lib/spinner';
 import { outputError, outputResult, errorMessage } from '../../lib/output';
+import { isInteractive } from '../../lib/tty';
 
 export const updateContactPropertyCommand = new Command('update')
   .description('Update a contact property definition')
@@ -72,7 +73,11 @@ Examples:
       }
 
       spinner.stop('Contact property updated');
-      outputResult(data, { json: globalOpts.json });
+      if (!globalOpts.json && isInteractive()) {
+        console.log(`Contact property updated: ${id}`);
+      } else {
+        outputResult(data!, { json: globalOpts.json });
+      }
     } catch (err) {
       spinner.fail('Failed to update contact property');
       outputError({ message: errorMessage(err, 'Unknown error'), code: 'update_error' }, { json: globalOpts.json });

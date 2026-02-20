@@ -4,6 +4,7 @@ import type { GlobalOpts } from '../../lib/client';
 import { requireClient } from '../../lib/client';
 import { createSpinner } from '../../lib/spinner';
 import { outputError, outputResult, errorMessage } from '../../lib/output';
+import { isInteractive } from '../../lib/tty';
 
 export const updateDomainCommand = new Command('update')
   .description('Update domain settings: TLS mode, open tracking, and click tracking')
@@ -67,7 +68,11 @@ Examples:
       }
 
       spinner.stop('Domain updated');
-      outputResult(data, { json: globalOpts.json });
+      if (!globalOpts.json && isInteractive()) {
+        console.log(`Domain updated: ${id}`);
+      } else {
+        outputResult(data!, { json: globalOpts.json });
+      }
     } catch (err) {
       spinner.fail('Failed to update domain');
       outputError(
