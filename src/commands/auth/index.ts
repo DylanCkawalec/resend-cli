@@ -1,6 +1,7 @@
 import { Command } from '@commander-js/extra-typings';
 import { buildHelpText } from '../../lib/help-text';
 import { loginCommand } from './login';
+import { logoutCommand } from './logout';
 
 export const authCommand = new Command('auth')
   .description('Manage authentication')
@@ -9,6 +10,8 @@ export const authCommand = new Command('auth')
     examples: [
       'resend auth login',
       'resend auth login --key re_123456789',
+      'resend auth logout',
     ],
   }))
-  .addCommand(loginCommand);
+  .addCommand(loginCommand)
+  .addCommand(logoutCommand);

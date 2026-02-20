@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -48,5 +48,11 @@ export function storeApiKey(apiKey: string): string {
   });
   chmodSync(configPath, 0o600);
 
+  return configPath;
+}
+
+export function removeApiKey(): string {
+  const configPath = join(getConfigDir(), 'credentials.json');
+  unlinkSync(configPath);
   return configPath;
 }
