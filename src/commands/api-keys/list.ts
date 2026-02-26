@@ -1,11 +1,8 @@
 import { Command } from '@commander-js/extra-typings';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { withSpinner } from '../../lib/spinner';
-import { outputResult } from '../../lib/output';
-import { isInteractive } from '../../lib/tty';
-import { renderApiKeysTable } from './utils';
+import { runList } from '../../lib/actions';
 import { buildHelpText } from '../../lib/help-text';
+import { renderApiKeysTable } from './utils';
 
 export const listApiKeysCommand = new Command('list')
   .description('List all API keys (IDs and names — tokens are never returned by this endpoint)')
@@ -23,19 +20,9 @@ export const listApiKeysCommand = new Command('list')
   )
   .action(async (_opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-
-    const resend = requireClient(globalOpts);
-
-    const list = await withSpinner(
-      { loading: 'Fetching API keys...', success: 'API keys fetched', fail: 'Failed to list API keys' },
-      () => resend.apiKeys.list(),
-      'list_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log(renderApiKeysTable(list.data));
-    } else {
-      outputResult(list!, { json: globalOpts.json });
-    }
+    await runList({
+      spinner: { loading: 'Fetching API keys...', success: 'API keys fetched', fail: 'Failed to list API keys' },
+      sdkCall: (resend) => resend.apiKeys.list(),
+      onInteractive: (list) => console.log(renderApiKeysTable(list.data)),
+    }, globalOpts);
   });

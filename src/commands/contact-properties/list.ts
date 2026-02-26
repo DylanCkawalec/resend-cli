@@ -1,10 +1,7 @@
 import { Command } from '@commander-js/extra-typings';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { withSpinner } from '../../lib/spinner';
-import { outputResult } from '../../lib/output';
+import { runList } from '../../lib/actions';
 import { parseLimitOpt, buildPaginationOpts, printPaginationHint } from '../../lib/pagination';
-import { isInteractive } from '../../lib/tty';
 import { renderContactPropertiesTable } from './utils';
 import { buildHelpText } from '../../lib/help-text';
 
@@ -36,22 +33,11 @@ export const listContactPropertiesCommand = new Command('list')
   )
   .action(async (opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-    const resend = requireClient(globalOpts);
-
     const limit = parseLimitOpt(opts.limit, globalOpts);
     const paginationOpts = buildPaginationOpts(limit, opts.after, opts.before);
-
-    const list = await withSpinner(
-      { loading: 'Fetching contact properties...', success: 'Contact properties fetched', fail: 'Failed to list contact properties' },
-      () => resend.contactProperties.list(paginationOpts),
-      'list_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log(renderContactPropertiesTable(list.data));
-      printPaginationHint(list);
-    } else {
-      outputResult(list!, { json: globalOpts.json });
-    }
+    await runList({
+      spinner: { loading: 'Fetching contact properties...', success: 'Contact properties fetched', fail: 'Failed to list contact properties' },
+      sdkCall: (resend) => resend.contactProperties.list(paginationOpts),
+      onInteractive: (list) => { console.log(renderContactPropertiesTable(list.data)); printPaginationHint(list); },
+    }, globalOpts);
   });

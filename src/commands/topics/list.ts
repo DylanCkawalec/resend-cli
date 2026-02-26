@@ -1,9 +1,6 @@
 import { Command } from '@commander-js/extra-typings';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { withSpinner } from '../../lib/spinner';
-import { outputResult } from '../../lib/output';
-import { isInteractive } from '../../lib/tty';
+import { runList } from '../../lib/actions';
 import { renderTopicsTable } from './utils';
 import { buildHelpText } from '../../lib/help-text';
 
@@ -24,18 +21,9 @@ contacts is handled via "resend contacts topics <contactId>".`,
   )
   .action(async (_opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-    const resend = requireClient(globalOpts);
-
-    const list = await withSpinner(
-      { loading: 'Fetching topics...', success: 'Topics fetched', fail: 'Failed to list topics' },
-      () => resend.topics.list(),
-      'list_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log(renderTopicsTable(list.data));
-    } else {
-      outputResult(list!, { json: globalOpts.json });
-    }
+    await runList({
+      spinner: { loading: 'Fetching topics...', success: 'Topics fetched', fail: 'Failed to list topics' },
+      sdkCall: (resend) => resend.topics.list(),
+      onInteractive: (list) => console.log(renderTopicsTable(list.data)),
+    }, globalOpts);
   });

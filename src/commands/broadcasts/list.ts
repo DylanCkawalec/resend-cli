@@ -1,10 +1,7 @@
 import { Command } from '@commander-js/extra-typings';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { withSpinner } from '../../lib/spinner';
-import { outputResult } from '../../lib/output';
+import { runList } from '../../lib/actions';
 import { parseLimitOpt, buildPaginationOpts, printPaginationHint } from '../../lib/pagination';
-import { isInteractive } from '../../lib/tty';
 import { renderBroadcastsTable } from './utils';
 import { buildHelpText } from '../../lib/help-text';
 
@@ -30,22 +27,11 @@ To retrieve full details (html, from, subject), use: resend broadcasts get <id>`
   )
   .action(async (opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-    const resend = requireClient(globalOpts);
-
     const limit = parseLimitOpt(opts.limit, globalOpts);
     const paginationOpts = buildPaginationOpts(limit, opts.after, opts.before);
-
-    const list = await withSpinner(
-      { loading: 'Fetching broadcasts...', success: 'Broadcasts fetched', fail: 'Failed to list broadcasts' },
-      () => resend.broadcasts.list(paginationOpts),
-      'list_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log(renderBroadcastsTable(list.data));
-      printPaginationHint(list);
-    } else {
-      outputResult(list!, { json: globalOpts.json });
-    }
+    await runList({
+      spinner: { loading: 'Fetching broadcasts...', success: 'Broadcasts fetched', fail: 'Failed to list broadcasts' },
+      sdkCall: (resend) => resend.broadcasts.list(paginationOpts),
+      onInteractive: (list) => { console.log(renderBroadcastsTable(list.data)); printPaginationHint(list); },
+    }, globalOpts);
   });

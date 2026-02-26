@@ -1,10 +1,7 @@
 import { Command } from '@commander-js/extra-typings';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { withSpinner } from '../../lib/spinner';
-import { outputResult } from '../../lib/output';
+import { runList } from '../../lib/actions';
 import { parseLimitOpt, buildPaginationOpts, printPaginationHint } from '../../lib/pagination';
-import { isInteractive } from '../../lib/tty';
 import { buildHelpText } from '../../lib/help-text';
 import { renderDomainsTable } from './utils';
 
@@ -28,22 +25,11 @@ export const listDomainsCommand = new Command('list')
   )
   .action(async (opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-    const resend = requireClient(globalOpts);
-
     const limit = parseLimitOpt(opts.limit, globalOpts);
     const paginationOpts = buildPaginationOpts(limit, opts.after, opts.before);
-
-    const list = await withSpinner(
-      { loading: 'Fetching domains...', success: 'Domains fetched', fail: 'Failed to list domains' },
-      () => resend.domains.list(paginationOpts),
-      'list_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log(renderDomainsTable(list.data));
-      printPaginationHint(list);
-    } else {
-      outputResult(list!, { json: globalOpts.json });
-    }
+    await runList({
+      spinner: { loading: 'Fetching domains...', success: 'Domains fetched', fail: 'Failed to list domains' },
+      sdkCall: (resend) => resend.domains.list(paginationOpts),
+      onInteractive: (list) => { console.log(renderDomainsTable(list.data)); printPaginationHint(list); },
+    }, globalOpts);
   });

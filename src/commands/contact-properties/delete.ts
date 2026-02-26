@@ -1,10 +1,6 @@
 import { Command } from '@commander-js/extra-typings';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { confirmDelete } from '../../lib/prompts';
-import { withSpinner } from '../../lib/spinner';
-import { outputResult } from '../../lib/output';
-import { isInteractive } from '../../lib/tty';
+import { runDelete } from '../../lib/actions';
 import { buildHelpText } from '../../lib/help-text';
 
 export const deleteContactPropertyCommand = new Command('delete')
@@ -29,26 +25,11 @@ Non-interactive: --yes is required to confirm deletion when stdin/stdout is not 
   )
   .action(async (id, opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-    const resend = requireClient(globalOpts);
-
-    if (!opts.yes) {
-      await confirmDelete(
-        id,
-        `Delete contact property "${id}"? This will remove this property from ALL contacts permanently.`,
-        globalOpts
-      );
-    }
-
-    await withSpinner(
-      { loading: 'Deleting contact property...', success: 'Contact property deleted', fail: 'Failed to delete contact property' },
-      () => resend.contactProperties.remove(id),
-      'delete_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log('Contact property deleted.');
-    } else {
-      outputResult({ object: 'contact_property', id, deleted: true }, { json: globalOpts.json });
-    }
+    await runDelete(id, !!opts.yes, {
+      confirmMessage: `Delete contact property "${id}"? This will remove this property from ALL contacts permanently.`,
+      spinner: { loading: 'Deleting contact property...', success: 'Contact property deleted', fail: 'Failed to delete contact property' },
+      object: 'contact_property',
+      successMsg: 'Contact property deleted.',
+      sdkCall: (resend) => resend.contactProperties.remove(id),
+    }, globalOpts);
   });

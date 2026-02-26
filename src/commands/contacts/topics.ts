@@ -1,9 +1,6 @@
 import { Command } from '@commander-js/extra-typings';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { withSpinner } from '../../lib/spinner';
-import { outputResult } from '../../lib/output';
-import { isInteractive } from '../../lib/tty';
+import { runList } from '../../lib/actions';
 import { buildHelpText } from '../../lib/help-text';
 import { renderContactTopicsTable, contactIdentifier } from './utils';
 
@@ -30,20 +27,11 @@ Use "resend contacts update-topics <id>" to change subscription statuses.`,
   )
   .action(async (id, _opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-    const resend = requireClient(globalOpts);
-
     // ListContactTopicsBaseOptions uses optional { id?, email? } (not a discriminated
     // union), so contactIdentifier's result is directly assignable without a cast.
-    const list = await withSpinner(
-      { loading: 'Fetching topic subscriptions...', success: 'Topic subscriptions fetched', fail: 'Failed to list topic subscriptions' },
-      () => resend.contacts.topics.list(contactIdentifier(id)),
-      'list_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log(renderContactTopicsTable(list.data));
-    } else {
-      outputResult(list!, { json: globalOpts.json });
-    }
+    await runList({
+      spinner: { loading: 'Fetching topic subscriptions...', success: 'Topic subscriptions fetched', fail: 'Failed to list topic subscriptions' },
+      sdkCall: (resend) => resend.contacts.topics.list(contactIdentifier(id)),
+      onInteractive: (list) => console.log(renderContactTopicsTable(list.data)),
+    }, globalOpts);
   });

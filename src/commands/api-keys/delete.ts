@@ -1,10 +1,6 @@
 import { Command } from '@commander-js/extra-typings';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { confirmDelete } from '../../lib/prompts';
-import { withSpinner } from '../../lib/spinner';
-import { outputResult } from '../../lib/output';
-import { isInteractive } from '../../lib/tty';
+import { runDelete } from '../../lib/actions';
 import { buildHelpText } from '../../lib/help-text';
 
 export const deleteApiKeyCommand = new Command('delete')
@@ -29,23 +25,11 @@ can delete itself — the API does not prevent self-deletion.`,
   )
   .action(async (id, opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-
-    const resend = requireClient(globalOpts);
-
-    if (!opts.yes) {
-      await confirmDelete(id, `Delete API key ${id}? Any services using this key will stop working.`, globalOpts);
-    }
-
-    await withSpinner(
-      { loading: 'Deleting API key...', success: 'API key deleted', fail: 'Failed to delete API key' },
-      () => resend.apiKeys.remove(id),
-      'delete_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log('API key deleted.');
-    } else {
-      outputResult({ object: 'api-key', id, deleted: true }, { json: globalOpts.json });
-    }
+    await runDelete(id, !!opts.yes, {
+      confirmMessage: `Delete API key ${id}? Any services using this key will stop working.`,
+      spinner: { loading: 'Deleting API key...', success: 'API key deleted', fail: 'Failed to delete API key' },
+      object: 'api-key',
+      successMsg: 'API key deleted.',
+      sdkCall: (resend) => resend.apiKeys.remove(id),
+    }, globalOpts);
   });

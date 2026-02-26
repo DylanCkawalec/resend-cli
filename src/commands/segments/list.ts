@@ -1,10 +1,7 @@
 import { Command } from '@commander-js/extra-typings';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { withSpinner } from '../../lib/spinner';
-import { outputResult } from '../../lib/output';
+import { runList } from '../../lib/actions';
 import { parseLimitOpt, buildPaginationOpts, printPaginationHint } from '../../lib/pagination';
-import { isInteractive } from '../../lib/tty';
 import { renderSegmentsTable } from './utils';
 import { buildHelpText } from '../../lib/help-text';
 
@@ -33,22 +30,11 @@ or "resend contacts add-segment".`,
   )
   .action(async (opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-    const resend = requireClient(globalOpts);
-
     const limit = parseLimitOpt(opts.limit, globalOpts);
     const paginationOpts = buildPaginationOpts(limit, opts.after, opts.before);
-
-    const list = await withSpinner(
-      { loading: 'Fetching segments...', success: 'Segments fetched', fail: 'Failed to list segments' },
-      () => resend.segments.list(paginationOpts),
-      'list_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log(renderSegmentsTable(list.data));
-      printPaginationHint(list);
-    } else {
-      outputResult(list!, { json: globalOpts.json });
-    }
+    await runList({
+      spinner: { loading: 'Fetching segments...', success: 'Segments fetched', fail: 'Failed to list segments' },
+      sdkCall: (resend) => resend.segments.list(paginationOpts),
+      onInteractive: (list) => { console.log(renderSegmentsTable(list.data)); printPaginationHint(list); },
+    }, globalOpts);
   });

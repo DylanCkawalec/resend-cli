@@ -1,10 +1,6 @@
 import { Command } from '@commander-js/extra-typings';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { confirmDelete } from '../../lib/prompts';
-import { withSpinner } from '../../lib/spinner';
-import { outputResult } from '../../lib/output';
-import { isInteractive } from '../../lib/tty';
+import { runDelete } from '../../lib/actions';
 import { buildHelpText } from '../../lib/help-text';
 
 export const deleteWebhookCommand = new Command('delete')
@@ -30,26 +26,11 @@ Non-interactive: --yes is required to confirm deletion when stdin/stdout is not 
   )
   .action(async (id, opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-    const resend = requireClient(globalOpts);
-
-    if (!opts.yes) {
-      await confirmDelete(
-        id,
-        `Delete webhook ${id}? Events will no longer be delivered to this endpoint.`,
-        globalOpts
-      );
-    }
-
-    await withSpinner(
-      { loading: 'Deleting webhook...', success: 'Webhook deleted', fail: 'Failed to delete webhook' },
-      () => resend.webhooks.remove(id),
-      'delete_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log('Webhook deleted.');
-    } else {
-      outputResult({ object: 'webhook', id, deleted: true }, { json: globalOpts.json });
-    }
+    await runDelete(id, !!opts.yes, {
+      confirmMessage: `Delete webhook ${id}? Events will no longer be delivered to this endpoint.`,
+      spinner: { loading: 'Deleting webhook...', success: 'Webhook deleted', fail: 'Failed to delete webhook' },
+      object: 'webhook',
+      successMsg: 'Webhook deleted.',
+      sdkCall: (resend) => resend.webhooks.remove(id),
+    }, globalOpts);
   });

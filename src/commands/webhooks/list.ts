@@ -1,10 +1,7 @@
 import { Command } from '@commander-js/extra-typings';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { withSpinner } from '../../lib/spinner';
-import { outputResult } from '../../lib/output';
+import { runList } from '../../lib/actions';
 import { parseLimitOpt, buildPaginationOpts, printPaginationHint } from '../../lib/pagination';
-import { isInteractive } from '../../lib/tty';
 import { buildHelpText } from '../../lib/help-text';
 import { renderWebhooksTable } from './utils';
 
@@ -30,22 +27,11 @@ The response includes has_more: true when additional pages exist.`,
   )
   .action(async (opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-    const resend = requireClient(globalOpts);
-
     const limit = parseLimitOpt(opts.limit, globalOpts);
     const paginationOpts = buildPaginationOpts(limit, opts.after, opts.before);
-
-    const list = await withSpinner(
-      { loading: 'Fetching webhooks...', success: 'Webhooks fetched', fail: 'Failed to list webhooks' },
-      () => resend.webhooks.list(paginationOpts),
-      'list_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log(renderWebhooksTable(list.data));
-      printPaginationHint(list);
-    } else {
-      outputResult(list!, { json: globalOpts.json });
-    }
+    await runList({
+      spinner: { loading: 'Fetching webhooks...', success: 'Webhooks fetched', fail: 'Failed to list webhooks' },
+      sdkCall: (resend) => resend.webhooks.list(paginationOpts),
+      onInteractive: (list) => { console.log(renderWebhooksTable(list.data)); printPaginationHint(list); },
+    }, globalOpts);
   });

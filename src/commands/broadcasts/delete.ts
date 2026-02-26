@@ -1,10 +1,6 @@
 import { Command } from '@commander-js/extra-typings';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { confirmDelete } from '../../lib/prompts';
-import { withSpinner } from '../../lib/spinner';
-import { outputResult } from '../../lib/output';
-import { isInteractive } from '../../lib/tty';
+import { runDelete } from '../../lib/actions';
 import { buildHelpText } from '../../lib/help-text';
 
 export const deleteBroadcastCommand = new Command('delete')
@@ -28,22 +24,11 @@ Non-interactive: --yes is required to confirm deletion when stdin/stdout is not 
   )
   .action(async (id, opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-    const resend = requireClient(globalOpts);
-
-    if (!opts.yes) {
-      await confirmDelete(id, `Delete broadcast ${id}? If scheduled, delivery will be cancelled.`, globalOpts);
-    }
-
-    await withSpinner(
-      { loading: 'Deleting broadcast...', success: 'Broadcast deleted', fail: 'Failed to delete broadcast' },
-      () => resend.broadcasts.remove(id),
-      'delete_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log('Broadcast deleted.');
-    } else {
-      outputResult({ object: 'broadcast', id, deleted: true }, { json: globalOpts.json });
-    }
+    await runDelete(id, !!opts.yes, {
+      confirmMessage: `Delete broadcast ${id}? If scheduled, delivery will be cancelled.`,
+      spinner: { loading: 'Deleting broadcast...', success: 'Broadcast deleted', fail: 'Failed to delete broadcast' },
+      object: 'broadcast',
+      successMsg: 'Broadcast deleted.',
+      sdkCall: (resend) => resend.broadcasts.remove(id),
+    }, globalOpts);
   });

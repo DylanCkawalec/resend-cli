@@ -1,10 +1,6 @@
 import { Command } from '@commander-js/extra-typings';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { confirmDelete } from '../../lib/prompts';
-import { withSpinner } from '../../lib/spinner';
-import { outputResult } from '../../lib/output';
-import { isInteractive } from '../../lib/tty';
+import { runDelete } from '../../lib/actions';
 import { buildHelpText } from '../../lib/help-text';
 
 export const deleteSegmentCommand = new Command('delete')
@@ -28,26 +24,11 @@ Non-interactive: --yes is required to confirm deletion when stdin/stdout is not 
   )
   .action(async (id, opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-    const resend = requireClient(globalOpts);
-
-    if (!opts.yes) {
-      await confirmDelete(
-        id,
-        `Delete segment ${id}? Contacts will not be deleted, but broadcasts targeting this segment will no longer work.`,
-        globalOpts
-      );
-    }
-
-    await withSpinner(
-      { loading: 'Deleting segment...', success: 'Segment deleted', fail: 'Failed to delete segment' },
-      () => resend.segments.remove(id),
-      'delete_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log('Segment deleted.');
-    } else {
-      outputResult({ object: 'segment', id, deleted: true }, { json: globalOpts.json });
-    }
+    await runDelete(id, !!opts.yes, {
+      confirmMessage: `Delete segment ${id}? Contacts will not be deleted, but broadcasts targeting this segment will no longer work.`,
+      spinner: { loading: 'Deleting segment...', success: 'Segment deleted', fail: 'Failed to delete segment' },
+      object: 'segment',
+      successMsg: 'Segment deleted.',
+      sdkCall: (resend) => resend.segments.remove(id),
+    }, globalOpts);
   });

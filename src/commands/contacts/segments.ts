@@ -1,9 +1,6 @@
 import { Command } from '@commander-js/extra-typings';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { withSpinner } from '../../lib/spinner';
-import { outputResult } from '../../lib/output';
-import { isInteractive } from '../../lib/tty';
+import { runList } from '../../lib/actions';
 import { buildHelpText } from '../../lib/help-text';
 import { renderSegmentsTable } from '../segments/utils';
 import { segmentContactIdentifier } from './utils';
@@ -26,18 +23,9 @@ export const listContactSegmentsCommand = new Command('segments')
   )
   .action(async (id, _opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-    const resend = requireClient(globalOpts);
-
-    const list = await withSpinner(
-      { loading: 'Fetching segments...', success: 'Segments fetched', fail: 'Failed to list segments' },
-      () => resend.contacts.segments.list(segmentContactIdentifier(id)),
-      'list_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log(renderSegmentsTable(list.data));
-    } else {
-      outputResult(list!, { json: globalOpts.json });
-    }
+    await runList({
+      spinner: { loading: 'Fetching segments...', success: 'Segments fetched', fail: 'Failed to list segments' },
+      sdkCall: (resend) => resend.contacts.segments.list(segmentContactIdentifier(id)),
+      onInteractive: (list) => console.log(renderSegmentsTable(list.data)),
+    }, globalOpts);
   });

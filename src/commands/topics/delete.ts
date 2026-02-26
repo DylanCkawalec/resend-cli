@@ -1,10 +1,6 @@
 import { Command } from '@commander-js/extra-typings';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { confirmDelete } from '../../lib/prompts';
-import { withSpinner } from '../../lib/spinner';
-import { outputResult } from '../../lib/output';
-import { isInteractive } from '../../lib/tty';
+import { runDelete } from '../../lib/actions';
 import { buildHelpText } from '../../lib/help-text';
 
 export const deleteTopicCommand = new Command('delete')
@@ -28,26 +24,11 @@ Non-interactive: --yes is required to confirm deletion when stdin/stdout is not 
   )
   .action(async (id, opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-    const resend = requireClient(globalOpts);
-
-    if (!opts.yes) {
-      await confirmDelete(
-        id,
-        `Delete topic ${id}? All contact subscriptions and broadcast associations will be removed.`,
-        globalOpts
-      );
-    }
-
-    await withSpinner(
-      { loading: 'Deleting topic...', success: 'Topic deleted', fail: 'Failed to delete topic' },
-      () => resend.topics.remove(id),
-      'delete_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log('Topic deleted.');
-    } else {
-      outputResult({ object: 'topic', id, deleted: true }, { json: globalOpts.json });
-    }
+    await runDelete(id, !!opts.yes, {
+      confirmMessage: `Delete topic ${id}? All contact subscriptions and broadcast associations will be removed.`,
+      spinner: { loading: 'Deleting topic...', success: 'Topic deleted', fail: 'Failed to delete topic' },
+      object: 'topic',
+      successMsg: 'Topic deleted.',
+      sdkCall: (resend) => resend.topics.remove(id),
+    }, globalOpts);
   });
