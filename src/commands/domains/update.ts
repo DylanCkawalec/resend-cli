@@ -1,10 +1,8 @@
 import { Command, Option } from '@commander-js/extra-typings';
 import type { UpdateDomainsOptions } from 'resend';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { withSpinner } from '../../lib/spinner';
-import { outputError, outputResult } from '../../lib/output';
-import { isInteractive } from '../../lib/tty';
+import { runWrite } from '../../lib/actions';
+import { outputError } from '../../lib/output';
 import { buildHelpText } from '../../lib/help-text';
 
 export const updateDomainCommand = new Command('update')
@@ -32,8 +30,6 @@ export const updateDomainCommand = new Command('update')
   .action(async (id, opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
 
-    const resend = requireClient(globalOpts);
-
     const { tls, openTracking, clickTracking } = opts;
 
     if (!tls && openTracking === undefined && clickTracking === undefined) {
@@ -51,16 +47,10 @@ export const updateDomainCommand = new Command('update')
     if (openTracking !== undefined) payload.openTracking = openTracking;
     if (clickTracking !== undefined) payload.clickTracking = clickTracking;
 
-    const data = await withSpinner(
-      { loading: 'Updating domain...', success: 'Domain updated', fail: 'Failed to update domain' },
-      () => resend.domains.update(payload),
-      'update_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log(`Domain updated: ${id}`);
-    } else {
-      outputResult(data, { json: globalOpts.json });
-    }
+    await runWrite({
+      spinner: { loading: 'Updating domain...', success: 'Domain updated', fail: 'Failed to update domain' },
+      sdkCall: (resend) => resend.domains.update(payload),
+      errorCode: 'update_error',
+      successMsg: `Domain updated: ${id}`,
+    }, globalOpts);
   });

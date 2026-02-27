@@ -1,10 +1,8 @@
 import { Command } from '@commander-js/extra-typings';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { withSpinner } from '../../lib/spinner';
-import { outputError, outputResult } from '../../lib/output';
+import { runWrite } from '../../lib/actions';
+import { outputError } from '../../lib/output';
 import { readFile } from '../../lib/files';
-import { isInteractive } from '../../lib/tty';
 import { buildHelpText } from '../../lib/help-text';
 
 export const updateBroadcastCommand = new Command('update')
@@ -36,7 +34,6 @@ Variable interpolation:
   )
   .action(async (id, opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-    const resend = requireClient(globalOpts);
 
     if (!opts.from && !opts.subject && !opts.html && !opts.htmlFile && !opts.text && !opts.name) {
       outputError(
@@ -51,22 +48,16 @@ Variable interpolation:
       html = readFile(opts.htmlFile, globalOpts);
     }
 
-    const data = await withSpinner(
-      { loading: 'Updating broadcast...', success: 'Broadcast updated', fail: 'Failed to update broadcast' },
-      () => resend.broadcasts.update(id, {
+    await runWrite({
+      spinner: { loading: 'Updating broadcast...', success: 'Broadcast updated', fail: 'Failed to update broadcast' },
+      sdkCall: (resend) => resend.broadcasts.update(id, {
         ...(opts.from && { from: opts.from }),
         ...(opts.subject && { subject: opts.subject }),
         ...(html && { html }),
         ...(opts.text && { text: opts.text }),
         ...(opts.name && { name: opts.name }),
       }),
-      'update_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log(`\nBroadcast updated: ${data.id}`);
-    } else {
-      outputResult(data, { json: globalOpts.json });
-    }
+      errorCode: 'update_error',
+      successMsg: `\nBroadcast updated: ${id}`,
+    }, globalOpts);
   });

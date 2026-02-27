@@ -1,9 +1,6 @@
 import { Command } from '@commander-js/extra-typings';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { withSpinner } from '../../lib/spinner';
-import { outputResult } from '../../lib/output';
-import { isInteractive } from '../../lib/tty';
+import { runWrite } from '../../lib/actions';
 import { buildHelpText } from '../../lib/help-text';
 
 export const verifyDomainCommand = new Command('verify')
@@ -25,18 +22,10 @@ Poll the status with: resend domains get <id>`,
   .action(async (id, _opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
 
-    const resend = requireClient(globalOpts);
-
-    const data = await withSpinner(
-      { loading: 'Verifying domain...', success: 'Verification started', fail: 'Failed to verify domain' },
-      () => resend.domains.verify(id),
-      'verify_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log(`Domain verification started. Check status with resend domains get ${id}.`);
-    } else {
-      outputResult(data, { json: globalOpts.json });
-    }
+    await runWrite({
+      spinner: { loading: 'Verifying domain...', success: 'Verification started', fail: 'Failed to verify domain' },
+      sdkCall: (resend) => resend.domains.verify(id),
+      errorCode: 'verify_error',
+      successMsg: `Domain verification started. Check status with resend domains get ${id}.`,
+    }, globalOpts);
   });

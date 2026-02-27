@@ -1,10 +1,7 @@
 import { Command } from '@commander-js/extra-typings';
 import type { UpdateContactOptions } from 'resend';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { withSpinner } from '../../lib/spinner';
-import { outputResult } from '../../lib/output';
-import { isInteractive } from '../../lib/tty';
+import { runWrite } from '../../lib/actions';
 import { buildHelpText } from '../../lib/help-text';
 import { contactIdentifier, parsePropertiesJson } from './utils';
 
@@ -38,7 +35,6 @@ Properties: --properties merges the given JSON object with existing properties.
   )
   .action(async (id, opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-    const resend = requireClient(globalOpts);
 
     const properties = parsePropertiesJson(opts.properties, globalOpts);
 
@@ -51,16 +47,10 @@ Properties: --properties merges the given JSON object with existing properties.
       ...(properties && { properties }),
     } as UpdateContactOptions;
 
-    const data = await withSpinner(
-      { loading: 'Updating contact...', success: 'Contact updated', fail: 'Failed to update contact' },
-      () => resend.contacts.update(payload),
-      'update_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log(`Contact updated: ${id}`);
-    } else {
-      outputResult(data, { json: globalOpts.json });
-    }
+    await runWrite({
+      spinner: { loading: 'Updating contact...', success: 'Contact updated', fail: 'Failed to update contact' },
+      sdkCall: (resend) => resend.contacts.update(payload),
+      errorCode: 'update_error',
+      successMsg: `Contact updated: ${id}`,
+    }, globalOpts);
   });

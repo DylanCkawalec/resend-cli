@@ -1,10 +1,7 @@
 import { Command } from '@commander-js/extra-typings';
 import type { RemoveContactSegmentOptions } from 'resend';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { withSpinner } from '../../lib/spinner';
-import { outputResult } from '../../lib/output';
-import { isInteractive } from '../../lib/tty';
+import { runWrite } from '../../lib/actions';
 import { buildHelpText } from '../../lib/help-text';
 import { segmentContactIdentifier } from './utils';
 
@@ -27,22 +24,15 @@ The <segmentId> argument must be a segment UUID (not an email).`,
   )
   .action(async (contactId, segmentId, _opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-    const resend = requireClient(globalOpts);
 
     // segmentContactIdentifier resolves UUID vs email for the ContactSegmentsBaseOptions
     // discriminated union. The spread of that union requires an explicit cast.
     const payload = { ...segmentContactIdentifier(contactId), segmentId } as RemoveContactSegmentOptions;
 
-    const data = await withSpinner(
-      { loading: 'Removing contact from segment...', success: 'Contact removed from segment', fail: 'Failed to remove contact from segment' },
-      () => resend.contacts.segments.remove(payload),
-      'remove_segment_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log(`Contact removed from segment: ${segmentId}`);
-    } else {
-      outputResult(data, { json: globalOpts.json });
-    }
+    await runWrite({
+      spinner: { loading: 'Removing contact from segment...', success: 'Contact removed from segment', fail: 'Failed to remove contact from segment' },
+      sdkCall: (resend) => resend.contacts.segments.remove(payload),
+      errorCode: 'remove_segment_error',
+      successMsg: `Contact removed from segment: ${segmentId}`,
+    }, globalOpts);
   });

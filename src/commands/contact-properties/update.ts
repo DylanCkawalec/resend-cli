@@ -1,9 +1,7 @@
 import { Command } from '@commander-js/extra-typings';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { withSpinner } from '../../lib/spinner';
-import { outputError, outputResult } from '../../lib/output';
-import { isInteractive } from '../../lib/tty';
+import { runWrite } from '../../lib/actions';
+import { outputError } from '../../lib/output';
 import { buildHelpText } from '../../lib/help-text';
 
 export const updateContactPropertyCommand = new Command('update')
@@ -34,7 +32,6 @@ The fallback value is used in broadcast template interpolation when a contact ha
   )
   .action(async (id, opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-    const resend = requireClient(globalOpts);
 
     if (opts.fallbackValue === undefined && !opts.clearFallbackValue) {
       outputError(
@@ -52,19 +49,13 @@ The fallback value is used in broadcast template interpolation when a contact ha
 
     const fallbackValue = opts.clearFallbackValue ? null : opts.fallbackValue;
 
-    const data = await withSpinner(
-      { loading: 'Updating contact property...', success: 'Contact property updated', fail: 'Failed to update contact property' },
-      () => resend.contactProperties.update({
+    await runWrite({
+      spinner: { loading: 'Updating contact property...', success: 'Contact property updated', fail: 'Failed to update contact property' },
+      sdkCall: (resend) => resend.contactProperties.update({
         id,
         ...(fallbackValue !== undefined && { fallbackValue }),
       }),
-      'update_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log(`Contact property updated: ${id}`);
-    } else {
-      outputResult(data, { json: globalOpts.json });
-    }
+      errorCode: 'update_error',
+      successMsg: `Contact property updated: ${id}`,
+    }, globalOpts);
   });

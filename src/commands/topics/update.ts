@@ -1,9 +1,7 @@
 import { Command } from '@commander-js/extra-typings';
 import type { GlobalOpts } from '../../lib/client';
-import { requireClient } from '../../lib/client';
-import { withSpinner } from '../../lib/spinner';
-import { outputError, outputResult } from '../../lib/output';
-import { isInteractive } from '../../lib/tty';
+import { runWrite } from '../../lib/actions';
+import { outputError } from '../../lib/output';
 import { buildHelpText } from '../../lib/help-text';
 
 export const updateTopicCommand = new Command('update')
@@ -28,7 +26,6 @@ To change the default subscription, delete the topic and recreate it.`,
   )
   .action(async (id, opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-    const resend = requireClient(globalOpts);
 
     if (!opts.name && !opts.description) {
       outputError(
@@ -37,20 +34,14 @@ To change the default subscription, delete the topic and recreate it.`,
       );
     }
 
-    const data = await withSpinner(
-      { loading: 'Updating topic...', success: 'Topic updated', fail: 'Failed to update topic' },
-      () => resend.topics.update({
+    await runWrite({
+      spinner: { loading: 'Updating topic...', success: 'Topic updated', fail: 'Failed to update topic' },
+      sdkCall: (resend) => resend.topics.update({
         id,
         ...(opts.name && { name: opts.name }),
         ...(opts.description && { description: opts.description }),
       }),
-      'update_error',
-      globalOpts,
-    );
-
-    if (!globalOpts.json && isInteractive()) {
-      console.log(`Topic updated: ${id}`);
-    } else {
-      outputResult(data, { json: globalOpts.json });
-    }
+      errorCode: 'update_error',
+      successMsg: `Topic updated: ${id}`,
+    }, globalOpts);
   });

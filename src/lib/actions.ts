@@ -57,6 +57,29 @@ export async function runDelete(
 }
 
 /**
+ * Shared pattern for write commands (update/verify/remove-segment) where
+ * interactive output is a single status message:
+ *   requireClient → withSpinner(errorCode) → if/else output
+ */
+export async function runWrite<T>(
+  config: {
+    spinner: SpinnerMessages;
+    sdkCall: SdkCall<T>;
+    errorCode: string;
+    successMsg: string;
+  },
+  globalOpts: GlobalOpts,
+): Promise<void> {
+  const resend = requireClient(globalOpts);
+  const data = await withSpinner(config.spinner, () => config.sdkCall(resend), config.errorCode, globalOpts);
+  if (!globalOpts.json && isInteractive()) {
+    console.log(config.successMsg);
+  } else {
+    outputResult(data, { json: globalOpts.json });
+  }
+}
+
+/**
  * Shared pattern for all list commands:
  *   requireClient → withSpinner → if/else output
  *
