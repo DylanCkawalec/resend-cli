@@ -43,7 +43,11 @@ export async function confirmDelete(
 
 export async function requireText(
   value: string | undefined,
-  prompt: { message: string; placeholder?: string; validate?: (value: string | undefined) => string | Error | undefined },
+  prompt: {
+    message: string;
+    placeholder?: string;
+    validate?: (value: string | undefined) => string | Error | undefined;
+  },
   error: { message: string; code: string },
   globalOpts: GlobalOpts,
 ): Promise<string> {
@@ -58,7 +62,10 @@ export async function requireText(
   const result = await p.text({
     message: prompt.message,
     placeholder: prompt.placeholder,
-    validate: prompt.validate ?? ((v) => (!v || v.length === 0 ? `${prompt.message} is required` : undefined)),
+    validate:
+      prompt.validate ??
+      ((v) =>
+        !v || v.length === 0 ? `${prompt.message} is required` : undefined),
   });
   if (p.isCancel(result)) {
     cancelAndExit('Cancelled.');
@@ -68,7 +75,10 @@ export async function requireText(
 
 export async function requireSelect<V extends string>(
   value: V | undefined,
-  prompt: { message: string; options: Parameters<typeof p.select<V>>[0]['options'] },
+  prompt: {
+    message: string;
+    options: Parameters<typeof p.select<V>>[0]['options'];
+  },
   error: { message: string; code: string },
   globalOpts: GlobalOpts,
 ): Promise<V> {
@@ -92,7 +102,11 @@ export async function requireSelect<V extends string>(
 
 export async function promptForMissing<
   T extends Record<string, string | undefined>,
->(current: T, fields: FieldSpec[], globalOpts: GlobalOpts): Promise<{ [K in keyof T]: string }> {
+>(
+  current: T,
+  fields: FieldSpec[],
+  globalOpts: GlobalOpts,
+): Promise<{ [K in keyof T]: string }> {
   const missing = fields.filter(
     (f) => f.required !== false && !current[f.flag],
   );

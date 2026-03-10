@@ -136,8 +136,7 @@ describe('api-keys delete command', () => {
     mockRemove.mockResolvedValueOnce({
       data: null,
       error: { message: 'API key not found', name: 'not_found' },
-    } as // biome-ignore lint/suspicious/noExplicitAny: test mock
-    any);
+    } as any); // biome-ignore lint/suspicious/noExplicitAny: test mock
     errorSpy = spyOn(console, 'error').mockImplementation(() => {});
     stderrSpy = spyOn(process.stderr, 'write').mockImplementation(() => true);
     exitSpy = mockExitThrow();

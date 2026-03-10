@@ -49,7 +49,11 @@ export const batchCommand = new Command('batch')
     const filePath = await requireText(
       opts.file,
       { message: 'Path to JSON file', placeholder: './emails.json' },
-      { message: 'Missing --file flag. Provide a JSON file with an array of email objects.', code: 'missing_file' },
+      {
+        message:
+          'Missing --file flag. Provide a JSON file with an array of email objects.',
+        code: 'missing_file',
+      },
       globalOpts,
     );
 

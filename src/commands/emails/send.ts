@@ -6,7 +6,11 @@ import { requireClient } from '../../lib/client';
 import { readFile } from '../../lib/files';
 import { buildHelpText } from '../../lib/help-text';
 import { outputError, outputResult } from '../../lib/output';
-import { cancelAndExit, promptForMissing, requireText } from '../../lib/prompts';
+import {
+  cancelAndExit,
+  promptForMissing,
+  requireText,
+} from '../../lib/prompts';
 import { withSpinner } from '../../lib/spinner';
 import { isInteractive } from '../../lib/tty';
 
@@ -144,8 +148,14 @@ export const sendCommand = new Command('send')
     if (!html && !text) {
       body = await requireText(
         undefined,
-        { message: 'Email body (plain text)', placeholder: 'Type your message...' },
-        { message: 'Missing email body. Provide --html, --html-file, or --text', code: 'missing_body' },
+        {
+          message: 'Email body (plain text)',
+          placeholder: 'Type your message...',
+        },
+        {
+          message: 'Missing email body. Provide --html, --html-file, or --text',
+          code: 'missing_body',
+        },
         globalOpts,
       );
     }
