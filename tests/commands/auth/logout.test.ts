@@ -1,8 +1,13 @@
-import { describe, test, expect, spyOn, afterEach, beforeEach } from 'bun:test';
-import { mkdirSync, writeFileSync, existsSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, spyOn, test } from 'bun:test';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { captureTestEnv, setupOutputSpies, expectExit1, mockExitThrow } from '../../helpers';
+import { join } from 'node:path';
+import {
+  captureTestEnv,
+  expectExit1,
+  mockExitThrow,
+  setupOutputSpies,
+} from '../../helpers';
 
 describe('logout command', () => {
   const restoreEnv = captureTestEnv();
@@ -12,7 +17,10 @@ describe('logout command', () => {
   let tmpDir: string;
 
   beforeEach(() => {
-    tmpDir = join(tmpdir(), `resend-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    tmpDir = join(
+      tmpdir(),
+      `resend-test-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
     mkdirSync(tmpDir, { recursive: true });
     process.env.XDG_CONFIG_HOME = tmpDir;
   });
@@ -31,7 +39,10 @@ describe('logout command', () => {
   function writeCredentials(key = 're_test_key_123') {
     const configDir = join(tmpDir, 'resend');
     mkdirSync(configDir, { recursive: true });
-    writeFileSync(join(configDir, 'credentials.json'), JSON.stringify({ api_key: key }) + '\n');
+    writeFileSync(
+      join(configDir, 'credentials.json'),
+      `${JSON.stringify({ api_key: key })}\n`,
+    );
   }
 
   test('removes credentials file when it exists (non-interactive)', async () => {
@@ -74,7 +85,8 @@ describe('logout command', () => {
     const { logoutCommand } = await import('../../../src/commands/auth/logout');
     await expectExit1(() => logoutCommand.parseAsync([], { from: 'user' }));
 
-    const output = JSON.parse(errorSpy!.mock.calls[0][0] as string);
+    expect(errorSpy).toBeDefined();
+    const output = JSON.parse(errorSpy?.mock.calls[0][0] as string);
     expect(output.error.code).toBe('remove_failed');
   });
 });
