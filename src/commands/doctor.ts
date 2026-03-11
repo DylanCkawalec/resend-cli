@@ -6,7 +6,8 @@ import { buildHelpText } from '../lib/help-text';
 import { errorMessage, outputResult } from '../lib/output';
 import { createSpinner } from '../lib/spinner';
 import { isInteractive } from '../lib/tty';
-import { PACKAGE_NAME, VERSION } from '../lib/version';
+import { GITHUB_RELEASES_URL } from '../lib/update-check';
+import { VERSION } from '../lib/version';
 
 type CheckStatus = 'pass' | 'warn' | 'fail';
 
@@ -19,13 +20,10 @@ type CheckResult = {
 
 async function checkCliVersion(): Promise<CheckResult> {
   try {
-    const encodedName = encodeURIComponent(PACKAGE_NAME);
-    const res = await fetch(
-      `https://registry.npmjs.org/${encodedName}/latest`,
-      {
-        signal: AbortSignal.timeout(5000),
-      },
-    );
+    const res = await fetch(GITHUB_RELEASES_URL, {
+      headers: { Accept: 'application/vnd.github.v3+json' },
+      signal: AbortSignal.timeout(5000),
+    });
     if (!res.ok) {
       return {
         name: 'CLI Version',
@@ -33,8 +31,19 @@ async function checkCliVersion(): Promise<CheckResult> {
         message: `v${VERSION} (could not check for updates)`,
       };
     }
-    const data = (await res.json()) as { version?: string };
-    const latest = data.version ?? 'unknown';
+    const data = (await res.json()) as {
+      tag_name?: string;
+      prerelease?: boolean;
+      draft?: boolean;
+    };
+    if (data.prerelease || data.draft) {
+      return {
+        name: 'CLI Version',
+        status: 'warn',
+        message: `v${VERSION} (could not check for updates)`,
+      };
+    }
+    const latest = data.tag_name?.replace(/^v/, '') ?? 'unknown';
     if (latest === VERSION) {
       return {
         name: 'CLI Version',

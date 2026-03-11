@@ -15,6 +15,8 @@ import { teamsCommand } from './commands/teams/index';
 import { topicsCommand } from './commands/topics/index';
 import { webhooksCommand } from './commands/webhooks/index';
 import { whoamiCommand } from './commands/whoami';
+import { errorMessage, outputError } from './lib/output';
+import { checkForUpdates } from './lib/update-check';
 import { PACKAGE_NAME, VERSION } from './lib/version';
 
 const BANNER = `
@@ -79,4 +81,12 @@ Examples:
   .addCommand(openCommand)
   .addCommand(whoamiCommand);
 
-program.parse();
+program
+  .parseAsync()
+  .then(() => checkForUpdates().catch(() => {}))
+  .catch((err) => {
+    outputError({
+      message: errorMessage(err, 'An unexpected error occurred'),
+      code: 'unexpected_error',
+    });
+  });
