@@ -53,13 +53,13 @@ Use this when you want to change the CLI and run your build locally.
 2. **Install dependencies**
 
    ```bash
-   npm install
+   pnpm install
    ```
 
 3. **Build locally**
 
    ```bash
-   npm run build
+   pnpm build
    ```
 
    Output: `./dist/cli.cjs`
@@ -69,7 +69,7 @@ Use this when you want to change the CLI and run your build locally.
 Use the dev script:
 
 ```bash
-npm run dev -- --version
+pnpm dev -- --version
 ```
 
 Or run the built JS bundle:
@@ -83,7 +83,7 @@ node dist/cli.cjs --version
 After editing source files, rebuild:
 
 ```bash
-npm run build
+pnpm build
 ```
 
 ### Building native binaries
@@ -91,7 +91,7 @@ npm run build
 To build a standalone native binary:
 
 ```bash
-npm run build:bin
+pnpm build:bin
 ```
 
 Output: `./dist/resend`
