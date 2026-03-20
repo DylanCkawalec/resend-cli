@@ -21,10 +21,15 @@ import { webhooksCommand } from './commands/webhooks/index';
 import { whoamiCommand } from './commands/whoami';
 import { setupCliExitHandler } from './lib/cli-exit';
 import { errorMessage, outputError } from './lib/output';
+import { trackCommand } from './lib/telemetry';
 import { checkForUpdates } from './lib/update-check';
 import { PACKAGE_NAME, VERSION } from './lib/version';
 
 setupCliExitHandler();
+
+let lastCommandName = '';
+let lastFlags: string[] = [];
+let lastGlobalFlags: string[] = [];
 
 const program = new Command()
   .name('resend')
@@ -53,6 +58,30 @@ const program = new Command()
     'Save API key as plaintext instead of secure storage',
   )
   .hook('preAction', (thisCommand, actionCommand) => {
+    const parts: string[] = [];
+    for (
+      let cmd = actionCommand;
+      cmd?.parent;
+      cmd = cmd.parent as typeof actionCommand
+    ) {
+      parts.unshift(cmd.name());
+    }
+    lastCommandName = parts.join(' ');
+
+    const extractFlags = (cmd: typeof actionCommand) =>
+      cmd.options
+        .filter(
+          (opt) => cmd.getOptionValueSource(opt.attributeName()) === 'cli',
+        )
+        .map(
+          (opt) =>
+            opt.long?.replace(/^--/, '') ?? opt.short?.replace(/^-/, '') ?? '',
+        )
+        .filter(Boolean);
+
+    lastFlags = extractFlags(actionCommand);
+    lastGlobalFlags = extractFlags(thisCommand);
+
     if (actionCommand.optsWithGlobals().quiet) {
       thisCommand.setOptionValue('json', true);
     }
@@ -119,6 +148,20 @@ ${pc.gray('Examples:')}
   .addCommand(updateCommand)
   .addCommand(teamsDeprecatedCommand);
 
+const telemetryCommand = new Command('telemetry')
+  .description('Telemetry management')
+  .helpCommand(false);
+
+telemetryCommand
+  .command('flush')
+  .argument('<file>')
+  .action(async (file) => {
+    const { flushFromFile } = await import('./lib/telemetry');
+    await flushFromFile(file);
+  });
+
+program.addCommand(telemetryCommand, { hidden: true });
+
 // Hide the deprecated --team option from help
 const teamOption = program.options.find((o) => o.long === '--team');
 if (teamOption) {
@@ -130,9 +173,18 @@ program
   .then(() => {
     // Skip the background update notice when the user explicitly ran `update`
     const ran = program.args[0];
-    if (ran === 'update') {
+    if (ran === 'update' || ran === 'telemetry') {
       return;
     }
+
+    if (lastCommandName) {
+      trackCommand(lastCommandName, {
+        ...program.opts(),
+        flags: lastFlags,
+        globalFlags: lastGlobalFlags,
+      });
+    }
+
     return checkForUpdates().catch(() => {});
   })
   .catch((err) => {
