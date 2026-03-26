@@ -111,6 +111,36 @@ describe('broadcasts update command', () => {
     expect(payload.name).toBe('New Label');
   });
 
+  test('passes explicit empty text to the SDK', async () => {
+    spies = setupOutputSpies();
+
+    const { updateBroadcastCommand } = await import(
+      '../../../src/commands/broadcasts/update'
+    );
+    await updateBroadcastCommand.parseAsync(
+      ['d1c2b3a4-5e6f-7a8b-9c0d-e1f2a3b4c5d6', '--text', ''],
+      { from: 'user' },
+    );
+
+    const payload = mockUpdate.mock.calls[0][1] as Record<string, unknown>;
+    expect(payload.text).toBe('');
+  });
+
+  test('passes explicit empty html to the SDK', async () => {
+    spies = setupOutputSpies();
+
+    const { updateBroadcastCommand } = await import(
+      '../../../src/commands/broadcasts/update'
+    );
+    await updateBroadcastCommand.parseAsync(
+      ['d1c2b3a4-5e6f-7a8b-9c0d-e1f2a3b4c5d6', '--html', ''],
+      { from: 'user' },
+    );
+
+    const payload = mockUpdate.mock.calls[0][1] as Record<string, unknown>;
+    expect(payload.html).toBe('');
+  });
+
   test('outputs JSON id when non-interactive', async () => {
     spies = setupOutputSpies();
 
@@ -254,6 +284,25 @@ describe('broadcasts update command', () => {
     expect(payload.html).toBe('<p>Updated from file</p>');
   });
 
+  test('treats empty --html-file as a provided file input', async () => {
+    spies = setupOutputSpies();
+    readFileSpy = vi
+      .spyOn(files, 'readFile')
+      .mockReturnValue('<p>From empty path</p>');
+
+    const { updateBroadcastCommand } = await import(
+      '../../../src/commands/broadcasts/update'
+    );
+    await updateBroadcastCommand.parseAsync(
+      ['d1c2b3a4-5e6f-7a8b-9c0d-e1f2a3b4c5d6', '--html-file', ''],
+      { from: 'user' },
+    );
+
+    expect(readFileSpy).toHaveBeenCalledWith('', expect.anything());
+    const payload = mockUpdate.mock.calls[0][1] as Record<string, unknown>;
+    expect(payload.html).toBe('<p>From empty path</p>');
+  });
+
   test('reads text body from --text-file and passes it to SDK', async () => {
     spies = setupOutputSpies();
     readFileSpy = vi
@@ -271,6 +320,25 @@ describe('broadcasts update command', () => {
     expect(readFileSpy).toHaveBeenCalledTimes(1);
     const payload = mockUpdate.mock.calls[0][1] as Record<string, unknown>;
     expect(payload.text).toBe('Updated text from file');
+  });
+
+  test('treats empty --text-file as a provided file input', async () => {
+    spies = setupOutputSpies();
+    readFileSpy = vi
+      .spyOn(files, 'readFile')
+      .mockReturnValue('Text from empty path');
+
+    const { updateBroadcastCommand } = await import(
+      '../../../src/commands/broadcasts/update'
+    );
+    await updateBroadcastCommand.parseAsync(
+      ['d1c2b3a4-5e6f-7a8b-9c0d-e1f2a3b4c5d6', '--text-file', ''],
+      { from: 'user' },
+    );
+
+    expect(readFileSpy).toHaveBeenCalledWith('', expect.anything());
+    const payload = mockUpdate.mock.calls[0][1] as Record<string, unknown>;
+    expect(payload.text).toBe('Text from empty path');
   });
 
   test('warns to stderr when --html and --html-file both provided, html-file wins', async () => {
@@ -367,6 +435,22 @@ describe('broadcasts update command', () => {
       './emails/newsletter.tsx',
       expect.anything(),
     );
+    const payload = mockUpdate.mock.calls[0][1] as Record<string, unknown>;
+    expect(payload.html).toBe('<html><body>Rendered</body></html>');
+  });
+
+  test('treats empty --react-email as a provided build input', async () => {
+    spies = setupOutputSpies();
+
+    const { updateBroadcastCommand } = await import(
+      '../../../src/commands/broadcasts/update'
+    );
+    await updateBroadcastCommand.parseAsync(
+      ['d1c2b3a4-5e6f-7a8b-9c0d-e1f2a3b4c5d6', '--react-email', ''],
+      { from: 'user' },
+    );
+
+    expect(mockBuildReactEmailHtml).toHaveBeenCalledWith('', expect.anything());
     const payload = mockUpdate.mock.calls[0][1] as Record<string, unknown>;
     expect(payload.html).toBe('<html><body>Rendered</body></html>');
   });

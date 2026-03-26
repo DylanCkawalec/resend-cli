@@ -63,7 +63,6 @@ export const updateTemplateCommand = new Command('update')
   )
   .action(async (idArg, opts, cmd) => {
     const globalOpts = cmd.optsWithGlobals() as GlobalOpts;
-    const id = await pickId(idArg, templatePickerConfig, globalOpts);
 
     if (
       opts.name == null &&
@@ -88,7 +87,10 @@ export const updateTemplateCommand = new Command('update')
       );
     }
 
-    if (opts.reactEmail && (opts.html || opts.htmlFile)) {
+    if (
+      opts.reactEmail != null &&
+      (opts.html != null || opts.htmlFile != null)
+    ) {
       outputError(
         {
           message: 'Cannot use --react-email with --html or --html-file',
@@ -98,7 +100,7 @@ export const updateTemplateCommand = new Command('update')
       );
     }
 
-    if (opts.html && opts.htmlFile) {
+    if (opts.html != null && opts.htmlFile != null) {
       outputError(
         {
           message: '--html and --html-file are mutually exclusive.',
@@ -119,15 +121,17 @@ export const updateTemplateCommand = new Command('update')
       );
     }
 
+    const id = await pickId(idArg, templatePickerConfig, globalOpts);
+
     let html = opts.html;
     let text = opts.text;
 
-    if (opts.htmlFile) {
+    if (opts.htmlFile != null) {
       html = readFile(opts.htmlFile, globalOpts);
     }
 
-    if (opts.textFile) {
-      if (opts.text) {
+    if (opts.textFile != null) {
+      if (opts.text != null) {
         process.stderr.write(
           'Warning: both --text and --text-file provided; using --text-file\n',
         );
@@ -135,7 +139,7 @@ export const updateTemplateCommand = new Command('update')
       text = readFile(opts.textFile, globalOpts);
     }
 
-    if (opts.reactEmail) {
+    if (opts.reactEmail != null) {
       html = await buildReactEmailHtml(opts.reactEmail, globalOpts);
     }
 
@@ -155,7 +159,7 @@ export const updateTemplateCommand = new Command('update')
             ...(opts.from != null && { from: opts.from }),
             ...(opts.replyTo != null && { replyTo: opts.replyTo }),
             ...(opts.alias != null && { alias: opts.alias }),
-            ...(opts.var && { variables: parseVariables(opts.var) }),
+            ...(opts.var != null && { variables: parseVariables(opts.var) }),
           }),
         errorCode: 'update_error',
         successMsg: `\nTemplate updated: ${id}`,
