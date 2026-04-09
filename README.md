@@ -648,6 +648,17 @@ Prints the CLI command tree as JSON for scripting and AI agents. In an interacti
 
 ---
 
+## Dry-run (no API call)
+
+`--dry-run` is only implemented where agents most often need to **validate a complex payload** before a high-impact send:
+
+- **`resend emails send ... --dry-run`** — validates inputs and prints `{ "dryRun": true, "request": { ... } }` without sending. Attachments appear as `filename` and `byteLength` only.
+- **`resend broadcasts create ... --dry-run`** — same for the broadcast create payload.
+
+Other write commands (batch, `broadcasts send`, webhooks, contacts, etc.) do not support `--dry-run` yet. If that would help your workflow, open an issue — likely next candidates are **`emails batch`** (large JSON files) and **`broadcasts send`** (confirm id + schedule before delivery).
+
+---
+
 ## Configuration
 
 | Item              | Path                                | Notes                                                        |
