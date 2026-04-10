@@ -186,7 +186,10 @@ program
       });
     }
 
-    void checkForUpdates().catch(() => {});
+    const globals = program.opts();
+    void checkForUpdates({
+      json: Boolean(globals.json || globals.quiet),
+    }).catch(() => {});
   })
   .catch((err) => {
     outputError({
